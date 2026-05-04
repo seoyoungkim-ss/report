@@ -38,6 +38,20 @@ class PeerReviewRecord:
     requester_dept: str
     reviewer_id: str
     reviewer_dept: str
+    collab_frequency: str = ""   # 주 1회 미만 / 주 1회 / 주 2~3회 / 주 4~5회 / 기타
+    assignment_method: str = ""  # 협업동료 / 과제내 / 부서내 / 랜덤배정
+
+
+@dataclass
+class MessageRecord:
+    sender_id: str
+    receiver_id: str
+    sender_dept: str
+    receiver_dept: str
+    send_dt: pd.Timestamp
+    letter_type: str   # 감사 / 응원 / 안부 / 협업 / 기념일
+    keywords: list[str]
+    is_anonymous: bool
 
 
 @dataclass
@@ -71,16 +85,30 @@ _ATTENDANCE_SCHEMA = {
 }
 
 _PEERREVIEW_SCHEMA = {
-    "requester_id":   ["요청자_사번", "요청자사번", "리뷰요청자사번", "requester_id", "from_id", "평가자사번"],
-    "requester_dept": ["요청자_부서", "요청자부서", "requester_dept", "from_dept"],
-    "reviewer_id":    ["리뷰어_사번", "리뷰어사번", "reviewer_id", "to_id", "동료사번", "피평가자사번"],
-    "reviewer_dept":  ["리뷰어_부서", "리뷰어부서", "reviewer_dept", "to_dept"],
+    "requester_id":      ["요청자_사번", "요청자사번", "리뷰요청자사번", "리뷰대상자_사번", "requester_id", "from_id", "평가자사번"],
+    "requester_dept":    ["요청자_부서", "요청자부서", "리뷰대상자_부서", "requester_dept", "from_dept"],
+    "reviewer_id":       ["리뷰어_사번", "리뷰어사번", "reviewer_id", "to_id", "동료사번", "피평가자사번"],
+    "reviewer_dept":     ["리뷰어_부서", "리뷰어부서", "reviewer_dept", "to_dept"],
+    "collab_frequency":  ["협업빈도", "추천사유_협업빈도", "추천사유", "협업_빈도", "collab_frequency", "frequency"],
+    "assignment_method": ["배정방식", "assignment_method", "배정유형", "선정방식"],
+}
+
+_MESSAGE_SCHEMA = {
+    "sender_id":    ["발신자_아이디", "발신자아이디", "발신자id", "sender_id", "from_id", "sender"],
+    "receiver_id":  ["수신자_아이디", "수신자아이디", "수신자id", "receiver_id", "to_id", "receiver"],
+    "sender_dept":  ["발신자_부서", "발신자부서", "sender_dept", "from_dept"],
+    "receiver_dept":["수신자_부서", "수신자부서", "receiver_dept", "to_dept"],
+    "send_dt":      ["발송일시", "발송일", "send_dt", "sent_at", "timestamp", "날짜", "일시"],
+    "letter_type":  ["레터유형", "레터_유형", "letter_type", "type", "유형"],
+    "keywords":     ["키워드", "keywords", "keyword", "태그"],
+    "is_anonymous": ["익명여부", "익명", "anonymous", "is_anonymous"],
 }
 
 
 def detect_column_mapping(df: pd.DataFrame, schema: str = "attendance") -> dict[str, str]:
+    """schema: 'attendance' | 'peerreview' | 'message'"""
     """Heuristically map canonical field names to actual column headers."""
-    mapping_schema = _ATTENDANCE_SCHEMA if schema == "attendance" else _PEERREVIEW_SCHEMA
+    mapping_schema = {"attendance": _ATTENDANCE_SCHEMA, "peerreview": _PEERREVIEW_SCHEMA, "message": _MESSAGE_SCHEMA}.get(schema, _ATTENDANCE_SCHEMA)
     columns_lower = {c.lower().strip(): c for c in df.columns}
     result = {}
     for canonical, keywords in mapping_schema.items():
@@ -185,7 +213,82 @@ def parse_peerreview_dataframe(
         if rev_dept in ("nan", "None"):
             rev_dept = "미분류"
 
-        records.append(PeerReviewRecord(req_id, req_dept, rev_id, rev_dept))
+        freq = ""
+        if col_map.get("collab_frequency") and col_map["collab_frequency"] in df.columns:
+            freq = str(row[col_map["collab_frequency"]]).strip()
+            if freq in ("nan", "None"):
+                freq = ""
+
+        method = ""
+        if col_map.get("assignment_method") and col_map["assignment_method"] in df.columns:
+            method = str(row[col_map["assignment_method"]]).strip()
+            if method in ("nan", "None"):
+                method = ""
+
+        records.append(PeerReviewRecord(req_id, req_dept, rev_id, rev_dept, freq, method))
+    return records, warnings
+
+
+# ---------------------------------------------------------------------------
+# Message parser
+# ---------------------------------------------------------------------------
+
+def parse_message_dataframe(
+    df: pd.DataFrame,
+    col_map: dict[str, str],
+) -> tuple[list[MessageRecord], list[str]]:
+    """Convert raw message-platform DataFrame to MessageRecord list."""
+    required = ["sender_id", "receiver_id"]
+    for key in required:
+        if key not in col_map or col_map[key] not in df.columns:
+            raise ValueError(f"메시지 데이터 필수 컬럼 '{key}'을(를) 찾을 수 없습니다.")
+
+    warnings: list[str] = []
+    records: list[MessageRecord] = []
+
+    for _, row in df.iterrows():
+        sender = str(row[col_map["sender_id"]]).strip()
+        receiver = str(row[col_map["receiver_id"]]).strip()
+        if not sender or sender in ("nan", "None") or not receiver or receiver in ("nan", "None"):
+            continue
+        if sender == receiver:
+            continue
+
+        sender_dept = "미분류"
+        if col_map.get("sender_dept") and col_map["sender_dept"] in df.columns:
+            v = str(row[col_map["sender_dept"]]).strip()
+            sender_dept = v if v not in ("nan", "None", "") else "미분류"
+
+        receiver_dept = "미분류"
+        if col_map.get("receiver_dept") and col_map["receiver_dept"] in df.columns:
+            v = str(row[col_map["receiver_dept"]]).strip()
+            receiver_dept = v if v not in ("nan", "None", "") else "미분류"
+
+        send_dt = pd.NaT
+        if col_map.get("send_dt") and col_map["send_dt"] in df.columns:
+            try:
+                send_dt = pd.to_datetime(row[col_map["send_dt"]])
+            except Exception:
+                pass
+
+        letter_type = ""
+        if col_map.get("letter_type") and col_map["letter_type"] in df.columns:
+            letter_type = str(row[col_map["letter_type"]]).strip()
+            if letter_type in ("nan", "None"):
+                letter_type = ""
+
+        kw_raw = ""
+        if col_map.get("keywords") and col_map["keywords"] in df.columns:
+            kw_raw = str(row[col_map["keywords"]]).strip()
+        keywords = [k.strip() for k in kw_raw.split(",") if k.strip() and k.strip() not in ("nan", "None")]
+
+        is_anon = False
+        if col_map.get("is_anonymous") and col_map["is_anonymous"] in df.columns:
+            v = str(row[col_map["is_anonymous"]]).strip().upper()
+            is_anon = v in ("Y", "YES", "TRUE", "1", "익명")
+
+        records.append(MessageRecord(sender, receiver, sender_dept, receiver_dept, send_dt, letter_type, keywords, is_anon))
+
     return records, warnings
 
 
@@ -587,26 +690,122 @@ def generate_sample_attendance() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+COLLAB_FREQUENCIES = ["주 1회 미만", "주 1회", "주 2~3회", "주 4~5회", "기타(상세사유필요)"]
+ASSIGNMENT_METHODS = ["협업동료", "과제내", "부서내", "랜덤배정"]
+LETTER_TYPES = ["감사", "응원", "안부", "협업", "기념일"]
+ALL_KEYWORDS = ["협력", "열정", "리더십", "배려", "책임감", "도움", "존경", "친절"]
+
+
 def generate_sample_peerreview(attendance_df: pd.DataFrame) -> pd.DataFrame:
-    """Generate realistic sample peer-review data based on attendance."""
+    """Generate realistic peer-review sample with collab frequency and assignment method."""
     random.seed(99)
     emps = attendance_df[["사번", "부서"]].drop_duplicates().values.tolist()
     rows = []
     for emp_id, dept in emps:
-        # Each employee picks 2~5 reviewers (mostly same dept, sometimes cross-dept)
-        n = random.randint(2, 5)
+        n = random.randint(4, 6)
         candidates = [(e, d) for e, d in emps if e != emp_id]
         same_dept = [(e, d) for e, d in candidates if d == dept]
         diff_dept = [(e, d) for e, d in candidates if d != dept]
-        pool = same_dept * 3 + diff_dept
+        # priority: 협업동료(cross/same) > 과제내 > 부서내 > 랜덤배정
+        selected: list[tuple[str, str, str]] = []
+        methods_pool = (
+            ["협업동료"] * 2 + ["과제내"] * 1 + ["부서내"] * 1 + ["랜덤배정"] * 2
+        )
+        pool = (diff_dept * 2 + same_dept * 3)
         random.shuffle(pool)
-        chosen = {e for e, _ in pool[:n]}
-        for rev_id in chosen:
-            rev_dept = next(d for e, d in emps if e == rev_id)
+        seen: set[str] = set()
+        for rev_pair in pool:
+            if len(selected) >= n:
+                break
+            rev_id, rev_dept = rev_pair
+            if rev_id in seen:
+                continue
+            seen.add(rev_id)
+            method = methods_pool[len(selected)] if len(selected) < len(methods_pool) else "랜덤배정"
+            # collaboration frequency: lower for cross-dept or low-collab (friendship bias)
+            if rev_dept == dept:
+                freq = random.choices(COLLAB_FREQUENCIES, weights=[0.10, 0.20, 0.35, 0.30, 0.05])[0]
+            else:
+                freq = random.choices(COLLAB_FREQUENCIES, weights=[0.35, 0.30, 0.20, 0.10, 0.05])[0]
+            selected.append((rev_id, rev_dept, method, freq))
+
+        for rev_id, rev_dept, method, freq in selected:
             rows.append({
-                "요청자_사번": emp_id, "요청자_부서": dept,
+                "리뷰대상자_사번": emp_id, "리뷰대상자_부서": dept,
                 "리뷰어_사번": rev_id, "리뷰어_부서": rev_dept,
+                "배정방식": method, "추천사유_협업빈도": freq,
             })
+    return pd.DataFrame(rows)
+
+
+def generate_sample_messages(attendance_df: pd.DataFrame) -> pd.DataFrame:
+    """Generate realistic message-platform sample data (3 months of activity)."""
+    import numpy as np
+    rng = random.Random(7)
+    emps = attendance_df[["사번", "부서"]].drop_duplicates().values.tolist()
+    id_to_dept = {e: d for e, d in emps}
+    emp_ids = [e for e, _ in emps]
+
+    # Simulate friend clusters (employees who message each other more)
+    shuffled = emp_ids[:]
+    rng.shuffle(shuffled)
+    cluster_size = max(3, len(shuffled) // 5)
+    clusters: list[list[str]] = [shuffled[i:i+cluster_size] for i in range(0, len(shuffled), cluster_size)]
+
+    rows = []
+    from datetime import datetime, timedelta
+    base_date = datetime(2025, 1, 1)
+
+    for day_offset in range(90):  # 3 months
+        cur_date = base_date + timedelta(days=day_offset)
+        if cur_date.weekday() >= 5:
+            continue  # weekdays only
+
+        sent_today: dict[str, int] = {}  # sender -> daily count
+        sent_this_week: dict[tuple[str, str], int] = {}  # (sender, receiver) -> weekly count
+
+        for sender in emp_ids:
+            daily = rng.choices([0, 1, 2, 3], weights=[0.50, 0.25, 0.15, 0.10])[0]
+            if sent_today.get(sender, 0) >= 3:
+                continue
+            for _ in range(daily):
+                if sent_today.get(sender, 0) >= 3:
+                    break
+                # find receiver — bias toward same cluster
+                sender_cluster = next((c for c in clusters if sender in c), [])
+                if sender_cluster and rng.random() < 0.55:
+                    candidates = [e for e in sender_cluster if e != sender]
+                else:
+                    candidates = [e for e in emp_ids if e != sender]
+                # weekly 1-message limit to same person
+                candidates = [e for e in candidates if sent_this_week.get((sender, e), 0) < 1]
+                if not candidates:
+                    continue
+                receiver = rng.choice(candidates)
+
+                hour = rng.randint(9, 18)
+                minute = rng.randint(0, 59)
+                dt = cur_date + timedelta(hours=hour, minutes=minute)
+
+                letter = rng.choice(LETTER_TYPES)
+                kw_count = rng.randint(1, 3)
+                kws = rng.sample(ALL_KEYWORDS, kw_count)
+                is_anon = rng.random() < 0.12
+
+                rows.append({
+                    "발신자_아이디": sender,
+                    "실제발신자_아이디": sender,
+                    "수신자_아이디": receiver,
+                    "발송일시": dt,
+                    "레터유형": letter,
+                    "키워드": ",".join(kws),
+                    "익명여부": "Y" if is_anon else "N",
+                    "발신자_부서": id_to_dept.get(sender, "미분류"),
+                    "수신자_부서": id_to_dept.get(receiver, "미분류"),
+                })
+                sent_today[sender] = sent_today.get(sender, 0) + 1
+                sent_this_week[(sender, receiver)] = sent_this_week.get((sender, receiver), 0) + 1
+
     return pd.DataFrame(rows)
 
 
