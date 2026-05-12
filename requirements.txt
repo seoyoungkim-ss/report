@@ -6,4 +6,5 @@ anthropic>=0.28.0
 networkx>=3.3
 pyvis>=0.3.2
 plotly>=5.22.0
+numpy>=1.26.0
 # python-louvain>=0.16  # optional: Louvain community detection (falls back to networkx greedy_modularity)
