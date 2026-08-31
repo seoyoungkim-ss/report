@@ -70,8 +70,10 @@ input,select{font-family:inherit;}
 .display-wrap{padding:22px 32px;}
 .today-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:10px;flex-wrap:wrap;}
 .today-panel-full{width:100%;}
-.panel-title{display:flex;align-items:center;gap:10px;margin:0;font-size:20px;font-weight:900;color:var(--gold);flex:none;}
-.panel-title .bar{width:6px;height:22px;background:var(--gold);border-radius:3px;display:inline-block;}
+.panel-title{display:flex;align-items:center;gap:12px;margin:0;font-size:30px;font-weight:900;color:var(--gold);flex:none;}
+.panel-title .bar{width:8px;height:30px;background:var(--gold);border-radius:3px;display:inline-block;}
+.exec-legend{color:var(--sub);font-size:14px;font-weight:700;margin-left:4px;white-space:nowrap;}
+.exec-legend b{color:var(--gold);}
 
 /* ---------- bracket ---------- */
 .bracket-scroll{overflow-x:auto;overflow-y:auto;padding-bottom:8px;}
@@ -79,7 +81,7 @@ input,select{font-family:inherit;}
 .bracket{position:relative;display:flex;flex-direction:column-reverse;gap:40px;padding:10px;}
 .round-block{display:flex;flex-direction:column;gap:8px;}
 .round-row{display:flex;flex-direction:row;align-items:center;justify-content:space-around;gap:12px;}
-.round-label{text-align:center;color:var(--sub);font-size:12px;font-weight:800;letter-spacing:2px;margin-bottom:2px;text-transform:uppercase;}
+.round-label{text-align:center;color:var(--sub);font-size:18px;font-weight:800;letter-spacing:2px;margin-bottom:4px;text-transform:uppercase;}
 .match{width:152px;flex:none;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
   border-radius:12px;padding:8px;margin:0;position:relative;transition:all .25s;}
 .match.decided{border-color:var(--cyan);box-shadow:0 0 18px rgba(38,224,217,.35);}
@@ -550,28 +552,36 @@ function buildBracket(teamIds) {
   const byes = size - n;
   const realMatches = totalR1 - byes;
   let ti = 0;
-  const round1 = [];
-  for (let i = 0; i < realMatches; i++) {
-    round1.push({
-      id: `r0m${i}`,
-      teamAId: teamIds[ti++],
-      teamBId: teamIds[ti++],
-      winnerId: null,
-      meta: {}
-    });
-  }
-  for (let i = 0; i < byes; i++) {
+  const round1 = new Array(totalR1);
+  const makeBye = idx => {
     const team = teamIds[ti++];
-    round1.push({
-      id: `r0m${realMatches + i}`,
+    round1[idx] = {
+      id: `r0m${idx}`,
       teamAId: team,
       teamBId: null,
       winnerId: team,
       meta: {
         auto: true
       }
-    });
+    };
+  };
+  // Byes go to the top seeds; the lowest-seeded teams play each other in
+  // round 1, with the very last seed held back so its bye lands right next
+  // to that match — e.g. with 9 teams: 1~6 get solo byes (paired 1v2,3v4,
+  // 5v6 in round 2), 7 plays 8, and the winner faces 9.
+  const leadingByes = byes > 0 ? byes - 1 : 0;
+  for (let i = 0; i < leadingByes; i++) makeBye(i);
+  for (let i = 0; i < realMatches; i++) {
+    const idx = leadingByes + i;
+    round1[idx] = {
+      id: `r0m${idx}`,
+      teamAId: teamIds[ti++],
+      teamBId: teamIds[ti++],
+      winnerId: null,
+      meta: {}
+    };
   }
+  if (byes > 0) makeBye(totalR1 - 1);
   const rounds = [round1];
   let prevCount = totalR1,
     r = 1;
@@ -1144,8 +1154,15 @@ function BracketBoard({
     const safetyTimer = setTimeout(recompute, 400);
     const onResize = () => recompute();
     window.addEventListener("resize", onResize);
+    // watch every match box individually, not just the container — a box's
+    // own size can change (font metrics settling, text re-wrapping) without
+    // the container's overall bounding box changing, which the container
+    // observer alone wouldn't catch.
     const ro = new ResizeObserver(() => recompute());
     if (containerRef.current) ro.observe(containerRef.current);
+    Object.values(matchRefs.current).forEach(el => {
+      if (el) ro.observe(el);
+    });
     return () => {
       window.removeEventListener("resize", onResize);
       ro.disconnect();
@@ -1289,11 +1306,13 @@ function DisplayView({
     className: "display-wrap"
   }, /*#__PURE__*/React.createElement("div", {
     className: "today-header-row"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "panel-title"
   }, /*#__PURE__*/React.createElement("span", {
     className: "bar"
   }), "\uC624\uB298\uC758 \uACBD\uAE30 \uD604\uD669 \xB7 ", info.game), /*#__PURE__*/React.createElement("div", {
+    className: "exec-legend"
+  }, "\u26A1\xD7", EXEC_MULTIPLIER, " ", /*#__PURE__*/React.createElement("b", null, "\uC784\uC6D0 \uCC38\uC5EC 2\uBC30\uB8F0 \uC801\uC6A9"))), /*#__PURE__*/React.createElement("div", {
     className: "top9-compact"
   }, /*#__PURE__*/React.createElement("div", {
     className: "top9-compact-title"
@@ -1921,7 +1940,7 @@ function App() {
   // moves up beside the final-round box (a narrower gap) instead of sitting
   // at the bottom, and needs to be a bit smaller to fit there
   const heroPos = state && dayInfo(state.display.activeDayKey).format === "ranking" ? "bottom" : "top";
-  const heroSize = heroGames.length > 1 ? 190 : heroPos === "top" ? 190 : 280;
+  const heroSize = heroGames.length > 1 ? 190 : heroPos === "top" ? 260 : 280;
   return /*#__PURE__*/React.createElement("div", {
     className: "app"
   }, /*#__PURE__*/React.createElement("div", {

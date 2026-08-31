@@ -29,14 +29,22 @@ function buildBracket(teamIds){
   const byes = size - n;
   const realMatches = totalR1 - byes;
   let ti = 0;
-  const round1 = [];
-  for(let i=0;i<realMatches;i++){
-    round1.push({ id:`r0m${i}`, teamAId:teamIds[ti++], teamBId:teamIds[ti++], winnerId:null, meta:{} });
-  }
-  for(let i=0;i<byes;i++){
+  const round1 = new Array(totalR1);
+  const makeBye = (idx)=>{
     const team = teamIds[ti++];
-    round1.push({ id:`r0m${realMatches+i}`, teamAId:team, teamBId:null, winnerId:team, meta:{auto:true} });
+    round1[idx] = { id:`r0m${idx}`, teamAId:team, teamBId:null, winnerId:team, meta:{auto:true} };
+  };
+  // Byes go to the top seeds; the lowest-seeded teams play each other in
+  // round 1, with the very last seed held back so its bye lands right next
+  // to that match — e.g. with 9 teams: 1~6 get solo byes (paired 1v2,3v4,
+  // 5v6 in round 2), 7 plays 8, and the winner faces 9.
+  const leadingByes = byes>0 ? byes-1 : 0;
+  for(let i=0;i<leadingByes;i++) makeBye(i);
+  for(let i=0;i<realMatches;i++){
+    const idx = leadingByes+i;
+    round1[idx] = { id:`r0m${idx}`, teamAId:teamIds[ti++], teamBId:teamIds[ti++], winnerId:null, meta:{} };
   }
+  if(byes>0) makeBye(totalR1-1);
   const rounds = [round1];
   let prevCount = totalR1, r = 1;
   while(prevCount>1){
@@ -380,8 +388,13 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra, 
     const safetyTimer = setTimeout(recompute, 400);
     const onResize = ()=>recompute();
     window.addEventListener("resize", onResize);
+    // watch every match box individually, not just the container — a box's
+    // own size can change (font metrics settling, text re-wrapping) without
+    // the container's overall bounding box changing, which the container
+    // observer alone wouldn't catch.
     const ro = new ResizeObserver(()=>recompute());
     if(containerRef.current) ro.observe(containerRef.current);
+    Object.values(matchRefs.current).forEach(el=>{ if(el) ro.observe(el); });
     return ()=>{ window.removeEventListener("resize", onResize); ro.disconnect(); clearTimeout(safetyTimer); };
   },[recompute]);
 
@@ -487,7 +500,10 @@ function DisplayView({ state }){
       </div>
       <div className="display-wrap">
         <div className="today-header-row">
-          <div className="panel-title"><span className="bar"></span>오늘의 경기 현황 · {info.game}</div>
+          <div>
+            <div className="panel-title"><span className="bar"></span>오늘의 경기 현황 · {info.game}</div>
+            <div className="exec-legend">⚡×{EXEC_MULTIPLIER} <b>임원 참여 2배룰 적용</b></div>
+          </div>
           <div className="top9-compact">
             <div className="top9-compact-title">종합 순위 TOP 9</div>
             <div className="top9-compact-grid">
@@ -887,7 +903,7 @@ function App(){
   // moves up beside the final-round box (a narrower gap) instead of sitting
   // at the bottom, and needs to be a bit smaller to fit there
   const heroPos = (state && dayInfo(state.display.activeDayKey).format==="ranking") ? "bottom" : "top";
-  const heroSize = heroGames.length>1 ? 190 : (heroPos==="top" ? 190 : 280);
+  const heroSize = heroGames.length>1 ? 190 : (heroPos==="top" ? 260 : 280);
 
   return (
     <div className="app">
