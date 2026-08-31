@@ -838,6 +838,11 @@ function RulesTab({ state }){
 /* ============================== admin: control tab ============================== */
 function ControlTab({ state, update }){
   const setActive = (key)=> update(s=>{ s.display.activeDayKey = key; return s; });
+  const resetAll = ()=>{
+    if(!window.confirm("이 브라우저에 저장된 모든 데이터(팀 정보, 대진표, 순위, 배점 설정 등)를 지우고 초기 상태로 되돌립니다. 계속할까요?")) return;
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    window.location.reload();
+  };
   return (
     <div className="card">
       <h3>송출 화면 제어</h3>
@@ -848,6 +853,15 @@ function ControlTab({ state, update }){
             {d.label} · {d.game}
           </button>
         ))}
+      </div>
+      <div style={{marginTop:18,paddingTop:16,borderTop:"1px dashed var(--line)"}}>
+        <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
+          이 노트북 브라우저에 예전 버전으로 저장된 데이터가 남아있으면(예: 업데이트 전 대진표) 새 파일을 열어도 그 저장된 내용이 계속 보입니다.
+          최신 상태로 완전히 초기화하려면 아래 버튼을 사용하세요.
+        </p>
+        <button className="small-btn" style={{borderColor:"var(--red)",color:"var(--red)"}} onClick={resetAll}>
+          ⚠️ 전체 초기화 (기본값으로 되돌리기)
+        </button>
       </div>
     </div>
   );

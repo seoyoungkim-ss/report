@@ -1813,6 +1813,13 @@ function ControlTab({
     s.display.activeDayKey = key;
     return s;
   });
+  const resetAll = () => {
+    if (!window.confirm("이 브라우저에 저장된 모든 데이터(팀 정보, 대진표, 순위, 배점 설정 등)를 지우고 초기 상태로 되돌립니다. 계속할까요?")) return;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+    window.location.reload();
+  };
   return /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("h3", null, "\uC1A1\uCD9C \uD654\uBA74 \uC81C\uC5B4"), /*#__PURE__*/React.createElement("p", {
@@ -1830,7 +1837,26 @@ function ControlTab({
     key: d.key,
     className: "tab-btn" + (state.display.activeDayKey === d.key ? " active" : ""),
     onClick: () => setActive(d.key)
-  }, d.label, " \xB7 ", d.game))));
+  }, d.label, " \xB7 ", d.game))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 18,
+      paddingTop: 16,
+      borderTop: "1px dashed var(--line)"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "var(--sub)",
+      fontSize: 12,
+      marginBottom: 8
+    }
+  }, "\uC774 \uB178\uD2B8\uBD81 \uBE0C\uB77C\uC6B0\uC800\uC5D0 \uC608\uC804 \uBC84\uC804\uC73C\uB85C \uC800\uC7A5\uB41C \uB370\uC774\uD130\uAC00 \uB0A8\uC544\uC788\uC73C\uBA74(\uC608: \uC5C5\uB370\uC774\uD2B8 \uC804 \uB300\uC9C4\uD45C) \uC0C8 \uD30C\uC77C\uC744 \uC5F4\uC5B4\uB3C4 \uADF8 \uC800\uC7A5\uB41C \uB0B4\uC6A9\uC774 \uACC4\uC18D \uBCF4\uC785\uB2C8\uB2E4. \uCD5C\uC2E0 \uC0C1\uD0DC\uB85C \uC644\uC804\uD788 \uCD08\uAE30\uD654\uD558\uB824\uBA74 \uC544\uB798 \uBC84\uD2BC\uC744 \uC0AC\uC6A9\uD558\uC138\uC694."), /*#__PURE__*/React.createElement("button", {
+    className: "small-btn",
+    style: {
+      borderColor: "var(--red)",
+      color: "var(--red)"
+    },
+    onClick: resetAll
+  }, "\u26A0\uFE0F \uC804\uCCB4 \uCD08\uAE30\uD654 (\uAE30\uBCF8\uAC12\uC73C\uB85C \uB418\uB3CC\uB9AC\uAE30)")));
 }
 
 /* ============================== admin root ============================== */
