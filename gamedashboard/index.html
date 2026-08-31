@@ -34,13 +34,11 @@ body{background:var(--bg);color:var(--text);}
 .fest-palm-l{left:-26px;transform:scaleX(-1);}
 .fest-palm-r{right:-26px;}
 .fest-wave{position:absolute;left:0;right:0;bottom:0;width:100%;height:110px;}
-/* today's game illustration(s) — flat, no card/backdrop, just the artwork */
-.fest-hero{position:absolute;bottom:120px;right:2%;max-width:34%;
-  display:flex;flex-wrap:wrap;gap:24px;align-items:flex-end;justify-content:flex-end;}
-.fest-hero-item{display:flex;flex-direction:column;align-items:center;gap:8px;}
-.fest-hero-item svg,.fest-hero-item img{filter:drop-shadow(0 12px 20px rgba(4,20,40,.32));}
-.fest-hero-item .label{color:#fff;font-weight:900;font-size:15px;letter-spacing:.5px;
-  text-shadow:0 2px 8px rgba(4,20,40,.45);white-space:nowrap;}
+/* today's game illustration(s) — flat, no backdrop/caption, scattered for a dynamic collage feel */
+.fest-hero{position:absolute;bottom:140px;right:11%;max-width:40%;
+  display:flex;align-items:center;}
+.fest-hero-item{display:flex;}
+.fest-hero-item svg,.fest-hero-item img{filter:drop-shadow(0 14px 20px rgba(4,20,40,.34));}
 button{font-family:inherit;cursor:pointer;}
 input,select{font-family:inherit;}
 ::-webkit-scrollbar{width:10px;height:10px;}
@@ -1922,16 +1920,33 @@ function App() {
     className: "fest-palm fest-palm-r"
   }, "\uD83C\uDF34"), heroGames.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "fest-hero"
-  }, heroGames.map(g => {
+  }, heroGames.map((g, i) => {
     const Illust = ILLUSTRATIONS[g.id];
+    const layout = heroGames.length > 1 ? [{
+      rot: -6,
+      y: 22,
+      ml: 0
+    }, {
+      rot: 9,
+      y: -30,
+      ml: -heroSize * 0.16
+    }][i] : {
+      rot: -7,
+      y: 0,
+      ml: 0
+    };
     return /*#__PURE__*/React.createElement("div", {
       className: "fest-hero-item",
-      key: g.id
+      key: g.id,
+      title: g.label,
+      style: {
+        transform: `rotate(${layout.rot}deg) translateY(${layout.y}px)`,
+        marginLeft: layout.ml,
+        zIndex: i
+      }
     }, /*#__PURE__*/React.createElement(Illust, {
       size: heroSize
-    }), /*#__PURE__*/React.createElement("span", {
-      className: "label"
-    }, g.label));
+    }));
   })), /*#__PURE__*/React.createElement("svg", {
     className: "fest-wave",
     viewBox: "0 0 1440 120",

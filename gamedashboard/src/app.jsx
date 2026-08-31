@@ -883,12 +883,15 @@ function App(){
         <span className="fest-palm fest-palm-r">🌴</span>
 
         {heroGames.length>0 && <div className="fest-hero">
-          {heroGames.map(g=>{
+          {heroGames.map((g,i)=>{
             const Illust = ILLUSTRATIONS[g.id];
+            const layout = heroGames.length>1
+              ? [{ rot:-6, y:22, ml:0 }, { rot:9, y:-30, ml:-heroSize*0.16 }][i]
+              : { rot:-7, y:0, ml:0 };
             return (
-              <div className="fest-hero-item" key={g.id}>
+              <div className="fest-hero-item" key={g.id} title={g.label}
+                style={{transform:`rotate(${layout.rot}deg) translateY(${layout.y}px)`, marginLeft:layout.ml, zIndex:i}}>
                 <Illust size={heroSize} />
-                <span className="label">{g.label}</span>
               </div>
             );
           })}
