@@ -1,10 +1,11 @@
 // Rebuilds gamedashboard/index.html as a single, fully self-contained,
-// offline HTML file: inlines React + ReactDOM (UMD production builds)
-// and the app source (src/app.jsx, pre-compiled from JSX with Babel).
+// offline HTML file: inlines React + ReactDOM (UMD production builds),
+// the Pretendard webfont (3 weights, base64), and the app source
+// (src/app.jsx, pre-compiled from JSX with Babel).
 //
 // Usage:
 //   cd gamedashboard
-//   npm install --no-save react@18 react-dom@18 @babel/core@7 @babel/preset-react@7
+//   npm install --no-save react@18 react-dom@18 @babel/core@7 @babel/preset-react@7 pretendard@1
 //   node build.js
 //
 // Output: gamedashboard/index.html (no external requests at runtime).
@@ -27,6 +28,23 @@ const reactDom = fs.readFileSync(
   "utf8"
 );
 
+const pretendardDir = path.join(
+  path.dirname(require.resolve("pretendard/package.json")),
+  "dist/web/static/woff2"
+);
+const fontFace = (weight, file) => {
+  const b64 = fs
+    .readFileSync(path.join(pretendardDir, file))
+    .toString("base64");
+  return `@font-face{font-family:'Pretendard';font-weight:${weight};font-display:swap;
+  src:url(data:font/woff2;base64,${b64}) format('woff2');}`;
+};
+const fonts = [
+  fontFace(400, "Pretendard-Regular.woff2"),
+  fontFace(700, "Pretendard-Bold.woff2"),
+  fontFace(900, "Pretendard-Black.woff2"),
+].join("\n");
+
 const { code: app } = babel.transform(jsx, {
   presets: ["@babel/preset-react"],
   filename: "app.jsx",
@@ -34,6 +52,7 @@ const { code: app } = babel.transform(jsx, {
 
 const html = `<title>썸머탈출 페스티벌</title>
 <style>
+${fonts}
 ${style}</style>
 
 <div id="root"></div>

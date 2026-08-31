@@ -26,6 +26,17 @@ body{background:var(--bg);color:var(--text);}
 .fest-palm-l{left:-26px;transform:scaleX(-1);}
 .fest-palm-r{right:-26px;}
 .fest-wave{position:absolute;left:0;right:0;bottom:0;width:100%;height:110px;}
+/* little game-illustration stickers, poster-style */
+.fest-sticker{position:absolute;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.fest-sticker .badge-circle{width:96px;height:96px;border-radius:50%;background:#fff8ea;
+  border:4px dashed rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;
+  font-size:46px;line-height:1;box-shadow:0 10px 22px rgba(4,20,40,.28);transform:rotate(var(--tilt,-6deg));}
+.fest-sticker .badge-label{background:#fff;color:#0b3a63;font-size:12px;font-weight:900;
+  padding:3px 12px;border-radius:999px;box-shadow:0 5px 12px rgba(4,20,40,.22);
+  transform:rotate(var(--tilt,-6deg));white-space:nowrap;}
+.fest-sticker-gonggi{top:150px;left:2%;--tilt:-8deg;}
+.fest-sticker-jenga{bottom:230px;right:1.5%;--tilt:7deg;}
+.fest-sticker-jump{bottom:96px;left:50%;transform:translateX(-50%);--tilt:-4deg;}
 button{font-family:inherit;cursor:pointer;}
 input,select{font-family:inherit;}
 ::-webkit-scrollbar{width:10px;height:10px;}

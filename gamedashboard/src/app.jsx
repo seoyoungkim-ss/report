@@ -833,6 +833,30 @@ function App(){
         <span className="fest-cloud fest-cloud-b">☁️</span>
         <span className="fest-palm fest-palm-l">🌴</span>
         <span className="fest-palm fest-palm-r">🌴</span>
+
+        {mode==="display" && <React.Fragment>
+          <div className="fest-sticker fest-sticker-gonggi">
+            <span className="badge-circle">🪨</span>
+            <span className="badge-label">공기놀이</span>
+          </div>
+          <div className="fest-sticker fest-sticker-jenga">
+            <span className="badge-circle">🧱</span>
+            <span className="badge-label">자이언트 젠가</span>
+          </div>
+          <div className="fest-sticker fest-sticker-jump">
+            <span className="badge-circle">
+              <svg viewBox="0 0 100 100" width="60" height="60">
+                <path d="M8,72 Q50,6 92,72" stroke="#e0542a" strokeWidth="6" fill="none" strokeLinecap="round"/>
+                <circle cx="34" cy="46" r="8" fill="#ffd166"/>
+                <path d="M34,54 L29,74 M34,54 L39,74 M27,59 L18,51 M41,59 L50,51" stroke="#0b3a63" strokeWidth="4" strokeLinecap="round" fill="none"/>
+                <circle cx="66" cy="40" r="8" fill="#ff5c8a"/>
+                <path d="M66,48 L61,72 M66,48 L71,72 M59,53 L50,45 M73,53 L82,45" stroke="#0b3a63" strokeWidth="4" strokeLinecap="round" fill="none"/>
+              </svg>
+            </span>
+            <span className="badge-label">단체줄넘기</span>
+          </div>
+        </React.Fragment>}
+
         <svg className="fest-wave" viewBox="0 0 1440 120" preserveAspectRatio="none">
           <path d="M0,45 C240,95 480,5 720,45 C960,85 1200,15 1440,55 L1440,120 L0,120 Z" fill="rgba(234,247,255,0.55)"/>
           <path d="M0,75 C240,115 480,45 720,75 C960,105 1200,55 1440,85 L1440,120 L0,120 Z" fill="rgba(234,247,255,0.9)"/>
