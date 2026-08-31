@@ -34,9 +34,14 @@ body{background:var(--bg);color:var(--text);}
 .fest-sticker .badge-label{background:#fff;color:#0b3a63;font-size:12px;font-weight:900;
   padding:3px 12px;border-radius:999px;box-shadow:0 5px 12px rgba(4,20,40,.22);
   transform:rotate(var(--tilt,-6deg));white-space:nowrap;}
-.fest-sticker-gonggi{top:150px;left:2%;--tilt:-8deg;}
-.fest-sticker-jenga{bottom:230px;right:1.5%;--tilt:7deg;}
+.fest-sticker-gonggi{bottom:210px;left:1.5%;--tilt:-8deg;}
+.fest-sticker-jenga{bottom:210px;right:1.5%;--tilt:7deg;}
+.fest-sticker-jenga .badge-circle{width:150px;height:150px;font-size:76px;}
+.fest-sticker-jenga .badge-label{font-size:14px;padding:4px 14px;}
 .fest-sticker-jump{bottom:96px;left:50%;transform:translateX(-50%);--tilt:-4deg;}
+.fest-sticker-jump-big{bottom:90px;--tilt:-3deg;}
+.fest-sticker-jump-big .badge-circle{width:210px;height:210px;}
+.fest-sticker-jump-big .badge-label{font-size:17px;padding:6px 20px;}
 button{font-family:inherit;cursor:pointer;}
 input,select{font-family:inherit;}
 ::-webkit-scrollbar{width:10px;height:10px;}

@@ -825,6 +825,8 @@ function App(){
     catch(e){ return "display"; }
   });
 
+  const isTeamBuildingDay = state && state.display && state.display.activeDayKey==="day3";
+
   return (
     <div className="app">
       <div className="fest-bg" aria-hidden="true">
@@ -843,9 +845,9 @@ function App(){
             <span className="badge-circle">🧱</span>
             <span className="badge-label">자이언트 젠가</span>
           </div>
-          <div className="fest-sticker fest-sticker-jump">
+          <div className={"fest-sticker fest-sticker-jump" + (isTeamBuildingDay ? " fest-sticker-jump-big" : "")}>
             <span className="badge-circle">
-              <svg viewBox="0 0 100 100" width="60" height="60">
+              <svg viewBox="0 0 100 100" width={isTeamBuildingDay ? 105 : 60} height={isTeamBuildingDay ? 105 : 60}>
                 <path d="M8,72 Q50,6 92,72" stroke="#e0542a" strokeWidth="6" fill="none" strokeLinecap="round"/>
                 <circle cx="34" cy="46" r="8" fill="#ffd166"/>
                 <path d="M34,54 L29,74 M34,54 L39,74 M27,59 L18,51 M41,59 L50,51" stroke="#0b3a63" strokeWidth="4" strokeLinecap="round" fill="none"/>
