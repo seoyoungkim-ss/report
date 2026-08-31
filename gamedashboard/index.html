@@ -580,6 +580,24 @@ function clearDownstream(bracket, round, idx) {
     }
   });
 }
+/* The order buildBracket() consumed to fill round-1 slots (real matches'
+   A,B pairs first, then each bye's single team) — reconstructing it lets
+   the seeding editor show/re-permute "who sits where" per day. */
+function getRound1TeamOrder(bracket) {
+  const order = [];
+  bracket.rounds[0].forEach(m => {
+    order.push(m.teamAId);
+    if (m.teamBId) order.push(m.teamBId);
+  });
+  return order;
+}
+function bracketHasResults(bracket) {
+  return bracket.rounds.some(round => round.some(m => {
+    const hasWinner = m.winnerId && !(m.meta && m.meta.auto);
+    const hasMeta = m.meta && (m.meta.firstMoverId || m.meta.setScore);
+    return hasWinner || hasMeta;
+  }));
+}
 
 /* ============================== default state ============================== */
 function defaultTeams() {
@@ -1096,6 +1114,60 @@ function FirstMoverPicker({
   }, teamsById[bId] && teamsById[bId].name, " \uC120\uACF5")));
 }
 
+/* ============================== admin: bracket seeding editor ============================== */
+/* Which of the 9 teams sits in which round-1 slot — configured per day,
+   since the day-to-day matchups aren't the same 9 teams in the same spots. */
+function SeedingEditor({
+  dayKey,
+  bracket,
+  teams,
+  update
+}) {
+  const order = getRound1TeamOrder(bracket);
+  const setPosition = (posIdx, teamId) => {
+    if (order[posIdx] === teamId) return;
+    if (bracketHasResults(bracket) && !window.confirm("자리를 바꾸면 이 Day에 입력된 모든 경기 결과가 초기화됩니다. 계속하시겠습니까?")) return;
+    update(s => {
+      const curOrder = getRound1TeamOrder(s.days[dayKey].bracket);
+      const fromIdx = curOrder.indexOf(teamId);
+      if (fromIdx === posIdx) return null;
+      const tmp = curOrder[posIdx];
+      curOrder[posIdx] = teamId;
+      curOrder[fromIdx] = tmp;
+      s.days[dayKey].bracket = buildBracket(curOrder);
+      return s;
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "\uB300\uC9C4 \uD3B8\uC131 (\uC790\uB9AC \uBC30\uC815)"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "var(--sub)",
+      fontSize: 12,
+      marginTop: -6,
+      marginBottom: 12
+    }
+  }, "\uC774 Day\uC758 \uB300\uC9C4\uD45C\uC5D0 \uC5B4\uB5A4 \uD300\uC744 \uC5B4\uB290 \uC790\uB9AC\uC5D0 \uBC30\uCE58\uD560\uC9C0 \uC815\uD558\uC138\uC694. Day\uB9C8\uB2E4 \uB9E4\uCE58\uC5C5\uC744 \uB2E4\uB974\uAC8C \uAD6C\uC131\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uAC19\uC740 \uC790\uB9AC\uC5D0 \uB2E4\uB978 \uD300\uC744 \uACE0\uB974\uBA74 \uC6D0\uB798 \uC788\uB358 \uD300\uACFC \uC790\uB3D9\uC73C\uB85C \uC790\uB9AC\uAC00 \uBC14\uB01D\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
+      gap: 10
+    }
+  }, order.map((teamId, idx) => /*#__PURE__*/React.createElement("div", {
+    className: "field",
+    key: idx,
+    style: {
+      marginBottom: 0
+    }
+  }, /*#__PURE__*/React.createElement("label", null, idx + 1, "\uBC88 \uC790\uB9AC"), /*#__PURE__*/React.createElement("select", {
+    value: teamId,
+    onChange: e => setPosition(idx, e.target.value)
+  }, teams.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t.id,
+    value: t.id
+  }, t.name)))))));
+}
+
 /* ============================== admin: day tab ============================== */
 function DayTab({
   dayKey,
@@ -1127,7 +1199,12 @@ function DayTab({
     });
   };
   if (info.format === "bracket") {
-    return /*#__PURE__*/React.createElement("div", {
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(SeedingEditor, {
+      dayKey: dayKey,
+      bracket: dayState.bracket,
+      teams: state.teams,
+      update: update
+    }), /*#__PURE__*/React.createElement("div", {
       className: "card"
     }, /*#__PURE__*/React.createElement("div", {
       className: "day-header"
@@ -1167,7 +1244,7 @@ function DayTab({
           })
         }))));
       }
-    }));
+    })));
   }
 
   // day3 ranking editor

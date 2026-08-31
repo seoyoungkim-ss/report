@@ -69,6 +69,24 @@ function clearDownstream(bracket, round, idx){
     }
   });
 }
+/* The order buildBracket() consumed to fill round-1 slots (real matches'
+   A,B pairs first, then each bye's single team) — reconstructing it lets
+   the seeding editor show/re-permute "who sits where" per day. */
+function getRound1TeamOrder(bracket){
+  const order = [];
+  bracket.rounds[0].forEach(m=>{
+    order.push(m.teamAId);
+    if(m.teamBId) order.push(m.teamBId);
+  });
+  return order;
+}
+function bracketHasResults(bracket){
+  return bracket.rounds.some(round=>round.some(m=>{
+    const hasWinner = m.winnerId && !(m.meta && m.meta.auto);
+    const hasMeta = m.meta && (m.meta.firstMoverId || m.meta.setScore);
+    return hasWinner || hasMeta;
+  }));
+}
 
 /* ============================== default state ============================== */
 function defaultTeams(){
@@ -415,6 +433,46 @@ function FirstMoverPicker({ match, onUpdate, teamsById, aId, bId }){
   );
 }
 
+/* ============================== admin: bracket seeding editor ============================== */
+/* Which of the 9 teams sits in which round-1 slot — configured per day,
+   since the day-to-day matchups aren't the same 9 teams in the same spots. */
+function SeedingEditor({ dayKey, bracket, teams, update }){
+  const order = getRound1TeamOrder(bracket);
+  const setPosition = (posIdx, teamId)=>{
+    if(order[posIdx]===teamId) return;
+    if(bracketHasResults(bracket) && !window.confirm("자리를 바꾸면 이 Day에 입력된 모든 경기 결과가 초기화됩니다. 계속하시겠습니까?")) return;
+    update(s=>{
+      const curOrder = getRound1TeamOrder(s.days[dayKey].bracket);
+      const fromIdx = curOrder.indexOf(teamId);
+      if(fromIdx===posIdx) return null;
+      const tmp = curOrder[posIdx];
+      curOrder[posIdx] = teamId;
+      curOrder[fromIdx] = tmp;
+      s.days[dayKey].bracket = buildBracket(curOrder);
+      return s;
+    });
+  };
+  return (
+    <div className="card">
+      <h3>대진 편성 (자리 배정)</h3>
+      <p style={{color:"var(--sub)",fontSize:12,marginTop:-6,marginBottom:12}}>
+        이 Day의 대진표에 어떤 팀을 어느 자리에 배치할지 정하세요. Day마다 매치업을 다르게 구성할 수 있습니다.
+        같은 자리에 다른 팀을 고르면 원래 있던 팀과 자동으로 자리가 바뀝니다.
+      </p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
+        {order.map((teamId,idx)=>(
+          <div className="field" key={idx} style={{marginBottom:0}}>
+            <label>{idx+1}번 자리</label>
+            <select value={teamId} onChange={(e)=>setPosition(idx, e.target.value)}>
+              {teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ============================== admin: day tab ============================== */
 function DayTab({ dayKey, state, update, teamsById }){
   const info = dayInfo(dayKey);
@@ -441,7 +499,9 @@ function DayTab({ dayKey, state, update, teamsById }){
 
   if(info.format==="bracket"){
     return (
-      <div className="card">
+      <div>
+        <SeedingEditor dayKey={dayKey} bracket={dayState.bracket} teams={state.teams} update={update} />
+        <div className="card">
         <div className="day-header">
           <div className="title">{info.label} · {info.game}</div>
           <div className="sub">{info.date} · {info.place} · {info.unit}</div>
@@ -472,6 +532,7 @@ function DayTab({ dayKey, state, update, teamsById }){
             );
           }}
         />
+        </div>
       </div>
     );
   }
