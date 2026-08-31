@@ -1,11 +1,12 @@
 // Rebuilds gamedashboard/index.html as a single, fully self-contained,
 // offline HTML file: inlines React + ReactDOM (UMD production builds),
-// the Pretendard webfont (3 weights, base64), and the app source
-// (src/app.jsx, pre-compiled from JSX with Babel).
+// the Pretendard webfont (3 weights, base64), SheetJS (xlsx, for the
+// admin-screen Excel export), and the app source (src/app.jsx,
+// pre-compiled from JSX with Babel).
 //
 // Usage:
 //   cd gamedashboard
-//   npm install --no-save react@18 react-dom@18 @babel/core@7 @babel/preset-react@7 pretendard@1
+//   npm install --no-save react@18 react-dom@18 @babel/core@7 @babel/preset-react@7 pretendard@1 xlsx@0.18
 //   node build.js
 //
 // Output: gamedashboard/index.html (no external requests at runtime).
@@ -27,6 +28,8 @@ const reactDom = fs.readFileSync(
   path.join(reactDomDir, "umd/react-dom.production.min.js"),
   "utf8"
 );
+const xlsxDir = path.dirname(require.resolve("xlsx/package.json"));
+const xlsx = fs.readFileSync(path.join(xlsxDir, "dist/xlsx.core.min.js"), "utf8");
 
 const pretendardDir = path.join(
   path.dirname(require.resolve("pretendard/package.json")),
@@ -79,6 +82,10 @@ ${reactDom}
 <script>
 /* game illustration images, embedded offline */
 const GAME_IMAGES = ${JSON.stringify(gameImages)};
+</script>
+<script>
+/* SheetJS (xlsx.core.min.js) — client-side Excel export, no network required */
+${xlsx}
 </script>
 <script>
 ${app}

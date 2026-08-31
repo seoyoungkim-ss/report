@@ -215,6 +215,62 @@ function computeOverall(state){
     .sort((a,b)=> b.total-a.total || b.firstPlaceCount-a.firstPlaceCount);
 }
 
+/* ============================== excel export ============================== */
+function teamName(state, id){
+  const t = state.teams.find(t=>t.id===id);
+  return t ? t.name : "-";
+}
+function overallSheetRows(state){
+  const overall = computeOverall(state);
+  const rows = [["순위","팀명", ...DAYS.map(d=>`${d.label} ${d.game}`), "총점", "1등 횟수"]];
+  overall.forEach((t,i)=>{ rows.push([ i+1, t.name, ...t.perDay, t.total, t.firstPlaceCount ]); });
+  return rows;
+}
+function bracketSheetRows(state, dayKey){
+  const d = dayInfo(dayKey);
+  const bracket = state.days[dayKey].bracket;
+  const header = ["라운드","경기","팀A","팀B","승리팀"];
+  if(d.hasFirstMover) header.push("선공");
+  if(d.hasSetScore) header.push("세트스코어");
+  const rows = [header];
+  bracket.rounds.forEach((round, r)=>{
+    const roundLabel = r===bracket.rounds.length-1 ? "결승" : `${r+1}라운드`;
+    round.forEach((m,i)=>{
+      const aId = getSlotTeam(bracket, r, i, "A");
+      const bId = getSlotTeam(bracket, r, i, "B");
+      const row = [
+        roundLabel, `${i+1}경기`,
+        aId ? teamName(state,aId) : "-",
+        bId ? teamName(state,bId) : "-",
+        m.winnerId ? teamName(state,m.winnerId) : "-",
+      ];
+      if(d.hasFirstMover) row.push(m.meta && m.meta.firstMoverId ? teamName(state,m.meta.firstMoverId) : "-");
+      if(d.hasSetScore) row.push(m.meta && m.meta.setScore ? m.meta.setScore : "-");
+      rows.push(row);
+    });
+  });
+  return rows;
+}
+function rankingSheetRows(state, dayKey){
+  const rows = [["순위","팀명","기록"]];
+  getRankedEntries(state.days[dayKey]).forEach(e=>{
+    rows.push([ e.rank ? `${e.rank}위` : "-", teamName(state,e.teamId), e.timeSec!=null ? fmtTime(e.timeSec) : "-" ]);
+  });
+  return rows;
+}
+function safeSheetName(name){
+  return name.replace(/[:\\/?*\[\]]/g," ").slice(0,31);
+}
+function buildResultWorkbook(state){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(overallSheetRows(state)), safeSheetName("종합순위"));
+  DAYS.forEach(d=>{
+    const rows = d.format==="ranking" ? rankingSheetRows(state, d.key) : bracketSheetRows(state, d.key);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), safeSheetName(`${d.label} ${d.game}`));
+  });
+  return wb;
+}
+
 /* ============================== misc utils ============================== */
 function fmtTime(sec){
   if(sec==null || isNaN(sec)) return "-";
@@ -904,6 +960,15 @@ function ControlTab({ state, update }){
     try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
     window.location.reload();
   };
+  const exportExcel = ()=>{
+    try{
+      const wb = buildResultWorkbook(state);
+      const stamp = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `썸머탈출페스티벌_결과_${stamp}.xlsx`);
+    }catch(e){
+      window.alert("엑셀 생성에 실패했습니다: " + (e && e.message ? e.message : e));
+    }
+  };
   return (
     <div className="card">
       <h3>송출 화면 제어</h3>
@@ -914,6 +979,14 @@ function ControlTab({ state, update }){
             {d.label} · {d.game}
           </button>
         ))}
+      </div>
+      <div style={{marginTop:18,paddingTop:16,borderTop:"1px dashed var(--line)"}}>
+        <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
+          현재까지 입력된 종합 순위와 Day별 대진표/순위 결과를 엑셀 파일(.xlsx)로 내려받습니다.
+        </p>
+        <button className="small-btn" onClick={exportExcel}>
+          📊 최종 결과 엑셀 다운로드
+        </button>
       </div>
       <div style={{marginTop:18,paddingTop:16,borderTop:"1px dashed var(--line)"}}>
         <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
