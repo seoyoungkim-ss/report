@@ -10,6 +10,7 @@ const DAYS = [
 ];
 const dayInfo = (k) => DAYS.find(d=>d.key===k);
 const STORAGE_KEY = "summer-escape-state-v1";
+const EXEC_MULTIPLIER = 2;
 
 /* ============================== bracket utils ============================== */
 function buildBracket(teamIds){
@@ -85,10 +86,10 @@ function createDefaultState(){
       day4:{ bracket: buildBracket(teamIds) },
     },
     scoring:{
-      day1:{ roundPoints:[10,20,30,40], multiplier:1.2, execTeams:[] },
-      day2:{ roundPoints:[10,20,30,40], multiplier:1.2, execTeams:[] },
-      day3:{ rankPoints:[100,90,80,70,60,50,40,30,20], multiplier:1.2, execTeams:[] },
-      day4:{ roundPoints:[10,20,30,40], multiplier:1.2, execTeams:[] },
+      day1:{ roundPoints:[10,20,30,40], execTeams:[] },
+      day2:{ roundPoints:[10,20,30,40], execTeams:[] },
+      day3:{ rankPoints:[100,90,80,70,60,50,40,30,20], execTeams:[] },
+      day4:{ roundPoints:[10,20,30,40], execTeams:[] },
     },
     display:{ activeDayKey:"day1" },
   };
@@ -132,7 +133,7 @@ function computeOverall(state){
     const applied = {};
     state.teams.forEach(t=>{
       let v = s[t.id]||0;
-      if(cfg.execTeams && cfg.execTeams.includes(t.id)) v = v * (cfg.multiplier||1);
+      if(cfg.execTeams && cfg.execTeams.includes(t.id)) v = v * EXEC_MULTIPLIER;
       applied[t.id] = v;
       totals[t.id] += v;
     });
@@ -210,7 +211,7 @@ function useLocalState(){
 }
 
 /* ============================== small components ============================== */
-function TeamChip({team, size}){
+function TeamChip({team, size, exec}){
   if(!team) return <span className="slot tbd">TBD</span>;
   return (
     <span className="team-chip">
@@ -218,16 +219,19 @@ function TeamChip({team, size}){
         ? <img className={"team-avatar" + (size==="big"?" big":"")} src={team.image} />
         : <span className="dot" style={{width:size==="big"?52:22,height:size==="big"?52:22,borderRadius:"50%",background:team.color,flex:"none",border:"2px solid rgba(255,255,255,.25)"}}></span>}
       <span className="team-name">{team.name}</span>
+      {exec && <span className="exec-badge" title={`임원 참여 ×${EXEC_MULTIPLIER}`}>⚡×{EXEC_MULTIPLIER}</span>}
     </span>
   );
 }
 
 /* ============================== bracket board ============================== */
-function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra }){
+/* Rounds stack bottom-to-top: round 1 at the bottom, the final at the top. */
+function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra, execTeamIds }){
   const containerRef = useRef(null);
   const matchRefs = useRef({});
   const [lines, setLines] = useState([]);
   const setRef = (r,i) => (el)=>{ matchRefs.current[`${r}-${i}`] = el; };
+  const isExec = (id)=> !!(id && execTeamIds && execTeamIds.includes(id));
 
   const recompute = useCallback(()=>{
     const cont = containerRef.current;
@@ -246,9 +250,11 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra }
         const tgtEl = matchRefs.current[`${r+1}-${targetIdx}`];
         if(!srcEl || !tgtEl) return;
         const sr = srcEl.getBoundingClientRect(), tr = tgtEl.getBoundingClientRect();
+        // source round sits below target round: line exits the top of the
+        // source box and enters the bottom of the target box.
         newLines.push({
-          x1: sr.right - cRect.left, y1: sr.top + sr.height/2 - cRect.top,
-          x2: tr.left - cRect.left, y2: tr.top + tr.height/2 - cRect.top,
+          x1: sr.left + sr.width/2 - cRect.left, y1: sr.top - cRect.top,
+          x2: tr.left + tr.width/2 - cRect.left, y2: tr.bottom - cRect.top,
           decided: !!round[i].winnerId,
         });
       });
@@ -270,53 +276,54 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra }
       <div className="bracket" ref={containerRef}>
         <svg className="connectors">
           {lines.map((l,idx)=>{
-            const midX = (l.x1+l.x2)/2;
-            const d = `M ${l.x1} ${l.y1} H ${midX} V ${l.y2} H ${l.x2}`;
+            const midY = (l.y1+l.y2)/2;
+            const d = `M ${l.x1} ${l.y1} V ${midY} H ${l.x2} V ${l.y2}`;
             return <path key={idx} d={d} className={l.decided?"decided":""} />;
           })}
         </svg>
         {bracket.rounds.map((round, r)=>(
-          <div className="round-col" key={r}>
+          <div className="round-block" key={r}>
             <div className="round-label">{r===bracket.rounds.length-1 ? "결승" : `${r+1}라운드`}</div>
-            {round.map((m, i)=>{
-              const aId = getSlotTeam(bracket, r, i, "A");
-              const bId = getSlotTeam(bracket, r, i, "B");
-              const aTeam = aId ? teamsById[aId] : null;
-              const bTeam = bId ? teamsById[bId] : null;
-              const isBye = m.meta && m.meta.auto;
-              const canPick = editable && !isBye && aTeam && bTeam;
-              const rowClass = (id)=> id && m.winnerId ? (id===m.winnerId?"slot winner":"slot loser") : "slot";
-              const pick = (teamId)=>{
-                if(!canPick) return;
-                const changing = !!m.winnerId && m.winnerId!==teamId;
-                if(changing && !window.confirm("정말 변경하시겠습니까? 다음 라운드에 반영된 결과도 함께 초기화됩니다.")) return;
-                onSetWinner(r, i, teamId);
-              };
-              return (
-                <div className={"match" + (m.winnerId?" decided":"")} key={m.id} ref={setRef(r,i)}>
-                  {canPick ? (
-                    <button className="slot-btn" onClick={()=>pick(aId)}>
-                      <span className={rowClass(aId)} style={{width:"100%"}}><TeamChip team={aTeam} /></span>
-                    </button>
-                  ) : (
-                    <div className={rowClass(aId) + (!aTeam?" tbd":"")}><TeamChip team={aTeam} /></div>
-                  )}
-                  {canPick ? (
-                    <button className="slot-btn" onClick={()=>pick(bId)}>
-                      <span className={rowClass(bId)} style={{width:"100%"}}><TeamChip team={bTeam} /></span>
-                    </button>
-                  ) : (
-                    <div className={rowClass(bId) + (!bTeam?" tbd":"")}><TeamChip team={bTeam} /></div>
-                  )}
-                  {isBye && <div className="match-meta"><span className="badge auto">부전승</span></div>}
-                  {m.meta && m.meta.firstMoverId && teamsById[m.meta.firstMoverId] &&
-                    <div className="match-meta">{m.meta.firstMoverLabel||"선공"}: <b>{teamsById[m.meta.firstMoverId].name}</b></div>}
-                  {m.meta && m.meta.setScore &&
-                    <div className="match-meta">세트 스코어: <b>{m.meta.setScore}</b></div>}
-                  {renderExtra && aTeam && bTeam && !isBye && renderExtra(m, r, i)}
-                </div>
-              );
-            })}
+            <div className="round-row">
+              {round.map((m, i)=>{
+                const aId = getSlotTeam(bracket, r, i, "A");
+                const bId = getSlotTeam(bracket, r, i, "B");
+                const aTeam = aId ? teamsById[aId] : null;
+                const bTeam = bId ? teamsById[bId] : null;
+                const isBye = m.meta && m.meta.auto;
+                const canPick = editable && !isBye && aTeam && bTeam;
+                const rowClass = (id)=> id && m.winnerId ? (id===m.winnerId?"slot winner":"slot loser") : "slot";
+                const pick = (teamId)=>{
+                  if(!canPick) return;
+                  const changing = !!m.winnerId && m.winnerId!==teamId;
+                  if(changing && !window.confirm("정말 변경하시겠습니까? 다음 라운드에 반영된 결과도 함께 초기화됩니다.")) return;
+                  onSetWinner(r, i, teamId);
+                };
+                return (
+                  <div className={"match" + (m.winnerId?" decided":"")} key={m.id} ref={setRef(r,i)}>
+                    {canPick ? (
+                      <button className="slot-btn" onClick={()=>pick(aId)}>
+                        <span className={rowClass(aId)} style={{width:"100%"}}><TeamChip team={aTeam} exec={isExec(aId)} /></span>
+                      </button>
+                    ) : (
+                      <div className={rowClass(aId) + (!aTeam?" tbd":"")}><TeamChip team={aTeam} exec={isExec(aId)} /></div>
+                    )}
+                    {canPick ? (
+                      <button className="slot-btn" onClick={()=>pick(bId)}>
+                        <span className={rowClass(bId)} style={{width:"100%"}}><TeamChip team={bTeam} exec={isExec(bId)} /></span>
+                      </button>
+                    ) : (
+                      <div className={rowClass(bId) + (!bTeam?" tbd":"")}><TeamChip team={bTeam} exec={isExec(bId)} /></div>
+                    )}
+                    {m.meta && m.meta.firstMoverId && teamsById[m.meta.firstMoverId] &&
+                      <div className="match-meta">{m.meta.firstMoverLabel||"선공"}: <b>{teamsById[m.meta.firstMoverId].name}</b></div>}
+                    {m.meta && m.meta.setScore &&
+                      <div className="match-meta">세트 스코어: <b>{m.meta.setScore}</b></div>}
+                    {renderExtra && aTeam && bTeam && !isBye && renderExtra(m, r, i)}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ))}
       </div>
@@ -325,7 +332,7 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra }
 }
 
 /* ============================== ranking board ============================== */
-function RankingBoard({ day3, teamsById }){
+function RankingBoard({ day3, teamsById, execTeamIds }){
   const ranked = getRankedEntries(day3).slice().sort((a,b)=>{
     if(a.rank==null) return 1; if(b.rank==null) return -1; return a.rank-b.rank;
   });
@@ -337,7 +344,7 @@ function RankingBoard({ day3, teamsById }){
         return (
           <div className={"rank-row " + rc} key={e.teamId}>
             <div className="rank-num">{e.rank || "-"}</div>
-            <TeamChip team={t} />
+            <TeamChip team={t} exec={execTeamIds && execTeamIds.includes(e.teamId)} />
             <div className="rank-time">{e.timeSec!=null ? fmtTime(e.timeSec) : "미기록"}</div>
           </div>
         );
@@ -351,6 +358,7 @@ function DisplayView({ state }){
   const teamsById = useMemo(()=>Object.fromEntries(state.teams.map(t=>[t.id,t])),[state.teams]);
   const activeKey = state.display.activeDayKey;
   const info = dayInfo(activeKey);
+  const execTeamIds = state.scoring[activeKey].execTeams;
   const overall = useMemo(()=>computeOverall(state),[state]);
 
   return (
@@ -365,10 +373,10 @@ function DisplayView({ state }){
       </div>
       <div className="display-wrap">
         <div className="today-panel">
-          <div className="panel-title"><span className="bar"></span>오늘의 경기 현황</div>
+          <div className="panel-title"><span className="bar"></span>오늘의 경기 현황 · {info.game}</div>
           {info.format==="bracket"
-            ? <BracketBoard bracket={state.days[activeKey].bracket} teamsById={teamsById} editable={false} onSetWinner={()=>{}} />
-            : <RankingBoard day3={state.days.day3} teamsById={teamsById} />}
+            ? <BracketBoard bracket={state.days[activeKey].bracket} teamsById={teamsById} editable={false} onSetWinner={()=>{}} execTeamIds={execTeamIds} />
+            : <RankingBoard day3={state.days.day3} teamsById={teamsById} execTeamIds={execTeamIds} />}
         </div>
         <div className="overall-panel">
           <div className="panel-title"><span className="bar" style={{background:"var(--cyan)"}}></span>종합 순위 TOP 9</div>
@@ -376,7 +384,7 @@ function DisplayView({ state }){
             {overall.map((t,idx)=>(
               <div className={"top9-row" + (idx<3?" top3":"")} key={t.id}>
                 <div className="top9-rank">{idx+1}</div>
-                <TeamChip team={t} />
+                <TeamChip team={t} exec={execTeamIds.includes(t.id)} />
                 <div className="top9-score">{t.total}<span style={{fontSize:11,color:"var(--sub)",fontWeight:600}}> pt</span></div>
               </div>
             ))}
@@ -387,54 +395,21 @@ function DisplayView({ state }){
   );
 }
 
-/* ============================== admin: stopwatch (day1 first mover) ============================== */
-function FirstMoverPanel({ match, onUpdate, teamsById, aId, bId }){
-  const target = (match.meta && match.meta.timerTarget) || 10;
-  const [running, setRunning] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const startRef = useRef(0);
-  const rafRef = useRef(null);
-  const [aVal, setAVal] = useState(match.meta && match.meta.teamAStopTime!=null ? String(match.meta.teamAStopTime) : "");
-  const [bVal, setBVal] = useState(match.meta && match.meta.teamBStopTime!=null ? String(match.meta.teamBStopTime) : "");
-
-  useEffect(()=>{
-    if(!running) return;
-    const tick = ()=>{
-      setElapsed((performance.now()-startRef.current)/1000);
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return ()=>cancelAnimationFrame(rafRef.current);
-  },[running]);
-
-  const start = ()=>{ startRef.current = performance.now(); setElapsed(0); setRunning(true); };
-  const stopA = ()=>{ if(running){ setAVal(elapsed.toFixed(2)); } };
-  const stopB = ()=>{ if(running){ setBVal(elapsed.toFixed(2)); } };
-  const stopAll = ()=> setRunning(false);
-
-  const judge = ()=>{
-    const a = parseFloat(aVal), b = parseFloat(bVal);
-    if(isNaN(a) || isNaN(b)){ window.alert("두 팀의 시간을 모두 입력해주세요."); return; }
-    const diffA = Math.abs(target-a), diffB = Math.abs(target-b);
-    const winnerId = diffA<=diffB ? aId : bId;
-    onUpdate({ timerTarget:target, teamAStopTime:a, teamBStopTime:b, firstMoverId:winnerId, firstMoverLabel:(match.meta&&match.meta.firstMoverLabel)||"선공" });
-  };
-
+/* ============================== admin: day1 first-mover picker ============================== */
+/* Admin just picks who goes first directly — the timer itself is run outside the app. */
+function FirstMoverPicker({ match, onUpdate, teamsById, aId, bId }){
+  const current = match.meta && match.meta.firstMoverId;
+  const pick = (teamId)=> onUpdate({ firstMoverId: teamId, firstMoverLabel: "선공" });
   return (
     <div className="stopwatch-box" onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:11,color:"var(--sub)",fontWeight:700,marginBottom:6}}>선공 팀 선택</div>
       <div className="stopwatch-row">
-        <span className="timer-display">{elapsed.toFixed(2)}s</span>
-        {!running
-          ? <button className="small-btn" onClick={start}>시작</button>
-          : <button className="small-btn" onClick={stopAll}>정지</button>}
-        <span style={{fontSize:11,color:"var(--sub)"}}>목표 {target}s</span>
-      </div>
-      <div className="stopwatch-row">
-        <button className="small-btn" onClick={stopA} disabled={!running}>{teamsById[aId] && teamsById[aId].name} 정지</button>
-        <input type="text" style={{width:70,background:"#081a34",border:"1px solid var(--line)",color:"var(--text)",borderRadius:8,padding:"6px 8px"}} value={aVal} onChange={e=>setAVal(e.target.value)} placeholder="시간(초)" />
-        <button className="small-btn" onClick={stopB} disabled={!running}>{teamsById[bId] && teamsById[bId].name} 정지</button>
-        <input type="text" style={{width:70,background:"#081a34",border:"1px solid var(--line)",color:"var(--text)",borderRadius:8,padding:"6px 8px"}} value={bVal} onChange={e=>setBVal(e.target.value)} placeholder="시간(초)" />
-        <button className="small-btn primary" onClick={judge}>판정</button>
+        <button className={"small-btn" + (current===aId?" primary":"")} onClick={()=>pick(aId)}>
+          {teamsById[aId] && teamsById[aId].name} 선공
+        </button>
+        <button className={"small-btn" + (current===bId?" primary":"")} onClick={()=>pick(bId)}>
+          {teamsById[bId] && teamsById[bId].name} 선공
+        </button>
       </div>
     </div>
   );
@@ -444,6 +419,7 @@ function FirstMoverPanel({ match, onUpdate, teamsById, aId, bId }){
 function DayTab({ dayKey, state, update, teamsById }){
   const info = dayInfo(dayKey);
   const dayState = state.days[dayKey];
+  const execTeamIds = state.scoring[dayKey].execTeams;
 
   const setWinner = (r,i,teamId)=>{
     update(s=>{
@@ -474,6 +450,7 @@ function DayTab({ dayKey, state, update, teamsById }){
           bracket={dayState.bracket}
           teamsById={teamsById}
           editable={true}
+          execTeamIds={execTeamIds}
           onSetWinner={(r,i,teamId)=>setWinner(r,i,teamId)}
           renderExtra={(m,r,i)=>{
             const aId = getSlotTeam(dayState.bracket, r, i, "A");
@@ -481,7 +458,7 @@ function DayTab({ dayKey, state, update, teamsById }){
             return (
               <div>
                 {info.hasFirstMover &&
-                  <FirstMoverPanel match={m} teamsById={teamsById} aId={aId} bId={bId}
+                  <FirstMoverPicker match={m} teamsById={teamsById} aId={aId} bId={bId}
                     onUpdate={(patch)=>setMeta(r,i,patch)} />}
                 {info.hasSetScore &&
                   <div className="stopwatch-box" onClick={e=>e.stopPropagation()}>
@@ -533,7 +510,7 @@ function DayTab({ dayKey, state, update, teamsById }){
           return (
             <div className="rank-edit-row" key={e.teamId}>
               <div style={{width:30,textAlign:"center",fontWeight:900,color:"var(--gold)"}}>{rankOf[e.teamId]||"-"}</div>
-              <TeamChip team={t} />
+              <TeamChip team={t} exec={execTeamIds.includes(e.teamId)} />
               {dayState.mode!=="manual"
                 ? <input type="text" style={{marginLeft:"auto",width:100}} placeholder="mm:ss"
                     defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}
@@ -606,9 +583,6 @@ function ScoringTab({ state, update }){
   const setRankPoints = (dayKey, idx, val)=> update(s=>{
     s.scoring[dayKey].rankPoints[idx] = parseFloat(val)||0; return s;
   });
-  const setMultiplier = (dayKey, val)=> update(s=>{
-    s.scoring[dayKey].multiplier = parseFloat(val)||1; return s;
-  });
   const toggleExec = (dayKey, teamId)=> update(s=>{
     const cfg = s.scoring[dayKey];
     const i = cfg.execTeams.indexOf(teamId);
@@ -642,9 +616,8 @@ function ScoringTab({ state, update }){
                 ))}
               </div>
             )}
-            <div className="field" style={{maxWidth:200,marginBottom:12}}>
-              <label>임원 참여 가중치 (배수)</label>
-              <input type="number" step="0.1" defaultValue={cfg.multiplier} onBlur={(e)=>setMultiplier(d.key, e.target.value)} />
+            <div style={{fontSize:12,color:"var(--sub)",marginBottom:10}}>
+              임원 참여 시 해당 팀의 {d.label} 획득 점수가 <b style={{color:"var(--gold)"}}>×{EXEC_MULTIPLIER}</b>로 계산됩니다.
             </div>
             <div>
               <label style={{fontSize:11,color:"var(--sub)",fontWeight:700}}>임원 참여 팀 선택</label>
@@ -652,7 +625,7 @@ function ScoringTab({ state, update }){
                 {state.teams.map(t=>(
                   <label className="exec-toggle" key={t.id}>
                     <input type="checkbox" checked={cfg.execTeams.includes(t.id)} onChange={()=>toggleExec(d.key, t.id)} />
-                    {t.name}
+                    {t.name}{cfg.execTeams.includes(t.id) && <span className="exec-badge" style={{marginLeft:4}}>×{EXEC_MULTIPLIER}</span>}
                   </label>
                 ))}
               </div>
@@ -686,7 +659,7 @@ function RulesTab({ state }){
               </table>
             )}
             <div style={{fontSize:13,color:"var(--sub)",marginTop:4}}>
-              임원 참여 시 획득 점수 × {cfg.multiplier} 적용 · 대상팀: {cfg.execTeams.length ? cfg.execTeams.map(id=>state.teams.find(t=>t.id===id)?.name).join(", ") : "없음"}
+              임원 참여 시 획득 점수 × {EXEC_MULTIPLIER} 적용 · 대상팀: {cfg.execTeams.length ? cfg.execTeams.map(id=>state.teams.find(t=>t.id===id)?.name).join(", ") : "없음"}
             </div>
           </div>
         );
@@ -762,7 +735,9 @@ function App(){
     <div className="app">
       {saveError && <div className="banner">⚠️ {saveError}</div>}
       {mode==="display" ? <DisplayView state={state} /> : <AdminView state={state} update={update} />}
-      <button className="floating-toggle" onClick={()=>setMode(m=>m==="admin"?"display":"admin")} title="관리자 모드 전환">·</button>
+      <button className="floating-toggle" onClick={()=>setMode(m=>m==="admin"?"display":"admin")} title="관리자 모드 전환 (여기를 눌러 전환)">
+        {mode==="admin" ? "📺" : "⚙️"}
+      </button>
     </div>
   );
 }

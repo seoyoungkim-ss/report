@@ -42,12 +42,14 @@ input,select{font-family:inherit;}
 .panel-title .bar{width:6px;height:22px;background:var(--gold);border-radius:3px;display:inline-block;}
 
 /* ---------- bracket ---------- */
-.bracket-scroll{overflow-x:auto;padding-bottom:8px;}
-.bracket{position:relative;display:flex;gap:56px;min-height:280px;padding:10px;}
-.round-col{display:flex;flex-direction:column;justify-content:space-around;min-width:220px;}
-.round-label{text-align:center;color:var(--sub);font-size:12px;font-weight:800;letter-spacing:2px;margin-bottom:8px;text-transform:uppercase;}
-.match{background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
-  border-radius:12px;padding:8px;margin:10px 0;position:relative;transition:all .25s;}
+.bracket-scroll{overflow-x:auto;overflow-y:auto;padding-bottom:8px;}
+/* rounds stack bottom-to-top: round 1 at the bottom, the final at the top */
+.bracket{position:relative;display:flex;flex-direction:column-reverse;gap:40px;padding:10px;}
+.round-block{display:flex;flex-direction:column;gap:8px;}
+.round-row{display:flex;flex-direction:row;align-items:center;justify-content:space-around;gap:16px;}
+.round-label{text-align:center;color:var(--sub);font-size:12px;font-weight:800;letter-spacing:2px;margin-bottom:2px;text-transform:uppercase;}
+.match{width:200px;flex:none;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
+  border-radius:12px;padding:8px;margin:0;position:relative;transition:all .25s;}
 .match.decided{border-color:var(--cyan);box-shadow:0 0 18px rgba(38,224,217,.35);}
 .slot{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;font-weight:700;font-size:14px;}
 .slot.tbd{color:var(--sub);font-style:italic;font-weight:500;}
@@ -79,6 +81,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .team-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;background:#1c3a68;flex:none;border:2px solid rgba(255,255,255,.25);}
 .team-avatar.big{width:52px;height:52px;}
 .team-name{font-weight:800;}
+.exec-badge{font-size:10px;font-weight:900;color:#241a00;background:var(--gold);border-radius:6px;padding:2px 6px;flex:none;}
 
 /* ---------- overall top9 ---------- */
 .top9{display:flex;flex-direction:column;gap:8px;}
@@ -113,11 +116,10 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .stopwatch-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
 .timer-display{font-variant-numeric:tabular-nums;font-size:20px;font-weight:900;color:var(--cyan2);min-width:80px;}
 .rank-edit-row{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;}
-.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:800;}
-.badge.auto{background:rgba(61,220,132,.15);color:var(--green);}
-.floating-toggle{position:fixed;right:10px;bottom:10px;width:26px;height:26px;border-radius:50%;
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:transparent;z-index:50;font-size:10px;}
-.floating-toggle:hover{color:var(--sub);background:rgba(255,255,255,.1);}
+.floating-toggle{position:fixed;right:16px;bottom:16px;width:46px;height:46px;border-radius:50%;
+  background:rgba(15,37,71,.85);border:2px solid var(--orange);color:var(--orange2);z-index:50;font-size:20px;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,.35);}
+.floating-toggle:hover{background:rgba(255,122,41,.25);color:#fff;}
 .banner{padding:10px 18px;background:#3a1a12;border-bottom:2px solid var(--red);color:#ffd9c9;font-size:13px;}
 .loading-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
 .spinner{width:44px;height:44px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--orange);animation:spin 1s linear infinite;}
@@ -487,6 +489,7 @@ const DAYS = [{
 }];
 const dayInfo = k => DAYS.find(d => d.key === k);
 const STORAGE_KEY = "summer-escape-state-v1";
+const EXEC_MULTIPLIER = 2;
 
 /* ============================== bracket utils ============================== */
 function buildBracket(teamIds) {
@@ -616,22 +619,18 @@ function createDefaultState() {
     scoring: {
       day1: {
         roundPoints: [10, 20, 30, 40],
-        multiplier: 1.2,
         execTeams: []
       },
       day2: {
         roundPoints: [10, 20, 30, 40],
-        multiplier: 1.2,
         execTeams: []
       },
       day3: {
         rankPoints: [100, 90, 80, 70, 60, 50, 40, 30, 20],
-        multiplier: 1.2,
         execTeams: []
       },
       day4: {
         roundPoints: [10, 20, 30, 40],
-        multiplier: 1.2,
         execTeams: []
       }
     },
@@ -695,7 +694,7 @@ function computeOverall(state) {
     const applied = {};
     state.teams.forEach(t => {
       let v = s[t.id] || 0;
-      if (cfg.execTeams && cfg.execTeams.includes(t.id)) v = v * (cfg.multiplier || 1);
+      if (cfg.execTeams && cfg.execTeams.includes(t.id)) v = v * EXEC_MULTIPLIER;
       applied[t.id] = v;
       totals[t.id] += v;
     });
@@ -795,7 +794,8 @@ function useLocalState() {
 /* ============================== small components ============================== */
 function TeamChip({
   team,
-  size
+  size,
+  exec
 }) {
   if (!team) return /*#__PURE__*/React.createElement("span", {
     className: "slot tbd"
@@ -817,16 +817,21 @@ function TeamChip({
     }
   }), /*#__PURE__*/React.createElement("span", {
     className: "team-name"
-  }, team.name));
+  }, team.name), exec && /*#__PURE__*/React.createElement("span", {
+    className: "exec-badge",
+    title: `임원 참여 ×${EXEC_MULTIPLIER}`
+  }, "\u26A1\xD7", EXEC_MULTIPLIER));
 }
 
 /* ============================== bracket board ============================== */
+/* Rounds stack bottom-to-top: round 1 at the bottom, the final at the top. */
 function BracketBoard({
   bracket,
   teamsById,
   editable,
   onSetWinner,
-  renderExtra
+  renderExtra,
+  execTeamIds
 }) {
   const containerRef = useRef(null);
   const matchRefs = useRef({});
@@ -834,6 +839,7 @@ function BracketBoard({
   const setRef = (r, i) => el => {
     matchRefs.current[`${r}-${i}`] = el;
   };
+  const isExec = id => !!(id && execTeamIds && execTeamIds.includes(id));
   const recompute = useCallback(() => {
     const cont = containerRef.current;
     if (!cont) return;
@@ -850,11 +856,13 @@ function BracketBoard({
         if (!srcEl || !tgtEl) return;
         const sr = srcEl.getBoundingClientRect(),
           tr = tgtEl.getBoundingClientRect();
+        // source round sits below target round: line exits the top of the
+        // source box and enters the bottom of the target box.
         newLines.push({
-          x1: sr.right - cRect.left,
-          y1: sr.top + sr.height / 2 - cRect.top,
-          x2: tr.left - cRect.left,
-          y2: tr.top + tr.height / 2 - cRect.top,
+          x1: sr.left + sr.width / 2 - cRect.left,
+          y1: sr.top - cRect.top,
+          x2: tr.left + tr.width / 2 - cRect.left,
+          y2: tr.bottom - cRect.top,
           decided: !!round[i].winnerId
         });
       });
@@ -880,19 +888,21 @@ function BracketBoard({
   }, /*#__PURE__*/React.createElement("svg", {
     className: "connectors"
   }, lines.map((l, idx) => {
-    const midX = (l.x1 + l.x2) / 2;
-    const d = `M ${l.x1} ${l.y1} H ${midX} V ${l.y2} H ${l.x2}`;
+    const midY = (l.y1 + l.y2) / 2;
+    const d = `M ${l.x1} ${l.y1} V ${midY} H ${l.x2} V ${l.y2}`;
     return /*#__PURE__*/React.createElement("path", {
       key: idx,
       d: d,
       className: l.decided ? "decided" : ""
     });
   })), bracket.rounds.map((round, r) => /*#__PURE__*/React.createElement("div", {
-    className: "round-col",
+    className: "round-block",
     key: r
   }, /*#__PURE__*/React.createElement("div", {
     className: "round-label"
-  }, r === bracket.rounds.length - 1 ? "결승" : `${r + 1}라운드`), round.map((m, i) => {
+  }, r === bracket.rounds.length - 1 ? "결승" : `${r + 1}라운드`), /*#__PURE__*/React.createElement("div", {
+    className: "round-row"
+  }, round.map((m, i) => {
     const aId = getSlotTeam(bracket, r, i, "A");
     const bId = getSlotTeam(bracket, r, i, "B");
     const aTeam = aId ? teamsById[aId] : null;
@@ -919,11 +929,13 @@ function BracketBoard({
         width: "100%"
       }
     }, /*#__PURE__*/React.createElement(TeamChip, {
-      team: aTeam
+      team: aTeam,
+      exec: isExec(aId)
     }))) : /*#__PURE__*/React.createElement("div", {
       className: rowClass(aId) + (!aTeam ? " tbd" : "")
     }, /*#__PURE__*/React.createElement(TeamChip, {
-      team: aTeam
+      team: aTeam,
+      exec: isExec(aId)
     })), canPick ? /*#__PURE__*/React.createElement("button", {
       className: "slot-btn",
       onClick: () => pick(bId)
@@ -933,27 +945,26 @@ function BracketBoard({
         width: "100%"
       }
     }, /*#__PURE__*/React.createElement(TeamChip, {
-      team: bTeam
+      team: bTeam,
+      exec: isExec(bId)
     }))) : /*#__PURE__*/React.createElement("div", {
       className: rowClass(bId) + (!bTeam ? " tbd" : "")
     }, /*#__PURE__*/React.createElement(TeamChip, {
-      team: bTeam
-    })), isBye && /*#__PURE__*/React.createElement("div", {
-      className: "match-meta"
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "badge auto"
-    }, "\uBD80\uC804\uC2B9")), m.meta && m.meta.firstMoverId && teamsById[m.meta.firstMoverId] && /*#__PURE__*/React.createElement("div", {
+      team: bTeam,
+      exec: isExec(bId)
+    })), m.meta && m.meta.firstMoverId && teamsById[m.meta.firstMoverId] && /*#__PURE__*/React.createElement("div", {
       className: "match-meta"
     }, m.meta.firstMoverLabel || "선공", ": ", /*#__PURE__*/React.createElement("b", null, teamsById[m.meta.firstMoverId].name)), m.meta && m.meta.setScore && /*#__PURE__*/React.createElement("div", {
       className: "match-meta"
     }, "\uC138\uD2B8 \uC2A4\uCF54\uC5B4: ", /*#__PURE__*/React.createElement("b", null, m.meta.setScore)), renderExtra && aTeam && bTeam && !isBye && renderExtra(m, r, i));
-  })))));
+  }))))));
 }
 
 /* ============================== ranking board ============================== */
 function RankingBoard({
   day3,
-  teamsById
+  teamsById,
+  execTeamIds
 }) {
   const ranked = getRankedEntries(day3).slice().sort((a, b) => {
     if (a.rank == null) return 1;
@@ -971,7 +982,8 @@ function RankingBoard({
     }, /*#__PURE__*/React.createElement("div", {
       className: "rank-num"
     }, e.rank || "-"), /*#__PURE__*/React.createElement(TeamChip, {
-      team: t
+      team: t,
+      exec: execTeamIds && execTeamIds.includes(e.teamId)
     }), /*#__PURE__*/React.createElement("div", {
       className: "rank-time"
     }, e.timeSec != null ? fmtTime(e.timeSec) : "미기록"));
@@ -985,6 +997,7 @@ function DisplayView({
   const teamsById = useMemo(() => Object.fromEntries(state.teams.map(t => [t.id, t])), [state.teams]);
   const activeKey = state.display.activeDayKey;
   const info = dayInfo(activeKey);
+  const execTeamIds = state.scoring[activeKey].execTeams;
   const overall = useMemo(() => computeOverall(state), [state]);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "topbar"
@@ -1008,14 +1021,16 @@ function DisplayView({
     className: "panel-title"
   }, /*#__PURE__*/React.createElement("span", {
     className: "bar"
-  }), "\uC624\uB298\uC758 \uACBD\uAE30 \uD604\uD669"), info.format === "bracket" ? /*#__PURE__*/React.createElement(BracketBoard, {
+  }), "\uC624\uB298\uC758 \uACBD\uAE30 \uD604\uD669 \xB7 ", info.game), info.format === "bracket" ? /*#__PURE__*/React.createElement(BracketBoard, {
     bracket: state.days[activeKey].bracket,
     teamsById: teamsById,
     editable: false,
-    onSetWinner: () => {}
+    onSetWinner: () => {},
+    execTeamIds: execTeamIds
   }) : /*#__PURE__*/React.createElement(RankingBoard, {
     day3: state.days.day3,
-    teamsById: teamsById
+    teamsById: teamsById,
+    execTeamIds: execTeamIds
   })), /*#__PURE__*/React.createElement("div", {
     className: "overall-panel"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1033,7 +1048,8 @@ function DisplayView({
   }, /*#__PURE__*/React.createElement("div", {
     className: "top9-rank"
   }, idx + 1), /*#__PURE__*/React.createElement(TeamChip, {
-    team: t
+    team: t,
+    exec: execTeamIds.includes(t.id)
   }), /*#__PURE__*/React.createElement("div", {
     className: "top9-score"
   }, t.total, /*#__PURE__*/React.createElement("span", {
@@ -1045,122 +1061,39 @@ function DisplayView({
   }, " pt"))))))));
 }
 
-/* ============================== admin: stopwatch (day1 first mover) ============================== */
-function FirstMoverPanel({
+/* ============================== admin: day1 first-mover picker ============================== */
+/* Admin just picks who goes first directly — the timer itself is run outside the app. */
+function FirstMoverPicker({
   match,
   onUpdate,
   teamsById,
   aId,
   bId
 }) {
-  const target = match.meta && match.meta.timerTarget || 10;
-  const [running, setRunning] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const startRef = useRef(0);
-  const rafRef = useRef(null);
-  const [aVal, setAVal] = useState(match.meta && match.meta.teamAStopTime != null ? String(match.meta.teamAStopTime) : "");
-  const [bVal, setBVal] = useState(match.meta && match.meta.teamBStopTime != null ? String(match.meta.teamBStopTime) : "");
-  useEffect(() => {
-    if (!running) return;
-    const tick = () => {
-      setElapsed((performance.now() - startRef.current) / 1000);
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [running]);
-  const start = () => {
-    startRef.current = performance.now();
-    setElapsed(0);
-    setRunning(true);
-  };
-  const stopA = () => {
-    if (running) {
-      setAVal(elapsed.toFixed(2));
-    }
-  };
-  const stopB = () => {
-    if (running) {
-      setBVal(elapsed.toFixed(2));
-    }
-  };
-  const stopAll = () => setRunning(false);
-  const judge = () => {
-    const a = parseFloat(aVal),
-      b = parseFloat(bVal);
-    if (isNaN(a) || isNaN(b)) {
-      window.alert("두 팀의 시간을 모두 입력해주세요.");
-      return;
-    }
-    const diffA = Math.abs(target - a),
-      diffB = Math.abs(target - b);
-    const winnerId = diffA <= diffB ? aId : bId;
-    onUpdate({
-      timerTarget: target,
-      teamAStopTime: a,
-      teamBStopTime: b,
-      firstMoverId: winnerId,
-      firstMoverLabel: match.meta && match.meta.firstMoverLabel || "선공"
-    });
-  };
+  const current = match.meta && match.meta.firstMoverId;
+  const pick = teamId => onUpdate({
+    firstMoverId: teamId,
+    firstMoverLabel: "선공"
+  });
   return /*#__PURE__*/React.createElement("div", {
     className: "stopwatch-box",
     onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
-    className: "stopwatch-row"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "timer-display"
-  }, elapsed.toFixed(2), "s"), !running ? /*#__PURE__*/React.createElement("button", {
-    className: "small-btn",
-    onClick: start
-  }, "\uC2DC\uC791") : /*#__PURE__*/React.createElement("button", {
-    className: "small-btn",
-    onClick: stopAll
-  }, "\uC815\uC9C0"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
-      color: "var(--sub)"
+      color: "var(--sub)",
+      fontWeight: 700,
+      marginBottom: 6
     }
-  }, "\uBAA9\uD45C ", target, "s")), /*#__PURE__*/React.createElement("div", {
+  }, "\uC120\uACF5 \uD300 \uC120\uD0DD"), /*#__PURE__*/React.createElement("div", {
     className: "stopwatch-row"
   }, /*#__PURE__*/React.createElement("button", {
-    className: "small-btn",
-    onClick: stopA,
-    disabled: !running
-  }, teamsById[aId] && teamsById[aId].name, " \uC815\uC9C0"), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    style: {
-      width: 70,
-      background: "#081a34",
-      border: "1px solid var(--line)",
-      color: "var(--text)",
-      borderRadius: 8,
-      padding: "6px 8px"
-    },
-    value: aVal,
-    onChange: e => setAVal(e.target.value),
-    placeholder: "\uC2DC\uAC04(\uCD08)"
-  }), /*#__PURE__*/React.createElement("button", {
-    className: "small-btn",
-    onClick: stopB,
-    disabled: !running
-  }, teamsById[bId] && teamsById[bId].name, " \uC815\uC9C0"), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    style: {
-      width: 70,
-      background: "#081a34",
-      border: "1px solid var(--line)",
-      color: "var(--text)",
-      borderRadius: 8,
-      padding: "6px 8px"
-    },
-    value: bVal,
-    onChange: e => setBVal(e.target.value),
-    placeholder: "\uC2DC\uAC04(\uCD08)"
-  }), /*#__PURE__*/React.createElement("button", {
-    className: "small-btn primary",
-    onClick: judge
-  }, "\uD310\uC815")));
+    className: "small-btn" + (current === aId ? " primary" : ""),
+    onClick: () => pick(aId)
+  }, teamsById[aId] && teamsById[aId].name, " \uC120\uACF5"), /*#__PURE__*/React.createElement("button", {
+    className: "small-btn" + (current === bId ? " primary" : ""),
+    onClick: () => pick(bId)
+  }, teamsById[bId] && teamsById[bId].name, " \uC120\uACF5")));
 }
 
 /* ============================== admin: day tab ============================== */
@@ -1172,6 +1105,7 @@ function DayTab({
 }) {
   const info = dayInfo(dayKey);
   const dayState = state.days[dayKey];
+  const execTeamIds = state.scoring[dayKey].execTeams;
   const setWinner = (r, i, teamId) => {
     update(s => {
       const b = s.days[dayKey].bracket;
@@ -1205,11 +1139,12 @@ function DayTab({
       bracket: dayState.bracket,
       teamsById: teamsById,
       editable: true,
+      execTeamIds: execTeamIds,
       onSetWinner: (r, i, teamId) => setWinner(r, i, teamId),
       renderExtra: (m, r, i) => {
         const aId = getSlotTeam(dayState.bracket, r, i, "A");
         const bId = getSlotTeam(dayState.bracket, r, i, "B");
-        return /*#__PURE__*/React.createElement("div", null, info.hasFirstMover && /*#__PURE__*/React.createElement(FirstMoverPanel, {
+        return /*#__PURE__*/React.createElement("div", null, info.hasFirstMover && /*#__PURE__*/React.createElement(FirstMoverPicker, {
           match: m,
           teamsById: teamsById,
           aId: aId,
@@ -1296,7 +1231,8 @@ function DayTab({
         color: "var(--gold)"
       }
     }, rankOf[e.teamId] || "-"), /*#__PURE__*/React.createElement(TeamChip, {
-      team: t
+      team: t,
+      exec: execTeamIds.includes(e.teamId)
     }), dayState.mode !== "manual" ? /*#__PURE__*/React.createElement("input", {
       type: "text",
       style: {
@@ -1421,10 +1357,6 @@ function ScoringTab({
     s.scoring[dayKey].rankPoints[idx] = parseFloat(val) || 0;
     return s;
   });
-  const setMultiplier = (dayKey, val) => update(s => {
-    s.scoring[dayKey].multiplier = parseFloat(val) || 1;
-    return s;
-  });
   const toggleExec = (dayKey, teamId) => update(s => {
     const cfg = s.scoring[dayKey];
     const i = cfg.execTeams.indexOf(teamId);
@@ -1471,17 +1403,16 @@ function ScoringTab({
         width: 80
       }
     })))), /*#__PURE__*/React.createElement("div", {
-      className: "field",
       style: {
-        maxWidth: 200,
-        marginBottom: 12
+        fontSize: 12,
+        color: "var(--sub)",
+        marginBottom: 10
       }
-    }, /*#__PURE__*/React.createElement("label", null, "\uC784\uC6D0 \uCC38\uC5EC \uAC00\uC911\uCE58 (\uBC30\uC218)"), /*#__PURE__*/React.createElement("input", {
-      type: "number",
-      step: "0.1",
-      defaultValue: cfg.multiplier,
-      onBlur: e => setMultiplier(d.key, e.target.value)
-    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    }, "\uC784\uC6D0 \uCC38\uC5EC \uC2DC \uD574\uB2F9 \uD300\uC758 ", d.label, " \uD68D\uB4DD \uC810\uC218\uAC00 ", /*#__PURE__*/React.createElement("b", {
+      style: {
+        color: "var(--gold)"
+      }
+    }, "\xD7", EXEC_MULTIPLIER), "\uB85C \uACC4\uC0B0\uB429\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
       style: {
         fontSize: 11,
         color: "var(--sub)",
@@ -1501,7 +1432,12 @@ function ScoringTab({
       type: "checkbox",
       checked: cfg.execTeams.includes(t.id),
       onChange: () => toggleExec(d.key, t.id)
-    }), t.name)))));
+    }), t.name, cfg.execTeams.includes(t.id) && /*#__PURE__*/React.createElement("span", {
+      className: "exec-badge",
+      style: {
+        marginLeft: 4
+      }
+    }, "\xD7", EXEC_MULTIPLIER))))));
   }));
 }
 
@@ -1533,7 +1469,7 @@ function RulesTab({
         color: "var(--sub)",
         marginTop: 4
       }
-    }, "\uC784\uC6D0 \uCC38\uC5EC \uC2DC \uD68D\uB4DD \uC810\uC218 \xD7 ", cfg.multiplier, " \uC801\uC6A9 \xB7 \uB300\uC0C1\uD300: ", cfg.execTeams.length ? cfg.execTeams.map(id => state.teams.find(t => t.id === id)?.name).join(", ") : "없음"));
+    }, "\uC784\uC6D0 \uCC38\uC5EC \uC2DC \uD68D\uB4DD \uC810\uC218 \xD7 ", EXEC_MULTIPLIER, " \uC801\uC6A9 \xB7 \uB300\uC0C1\uD300: ", cfg.execTeams.length ? cfg.execTeams.map(id => state.teams.find(t => t.id === id)?.name).join(", ") : "없음"));
   }));
 }
 
@@ -1680,8 +1616,8 @@ function App() {
   }), /*#__PURE__*/React.createElement("button", {
     className: "floating-toggle",
     onClick: () => setMode(m => m === "admin" ? "display" : "admin"),
-    title: "\uAD00\uB9AC\uC790 \uBAA8\uB4DC \uC804\uD658"
-  }, "\xB7"));
+    title: "\uAD00\uB9AC\uC790 \uBAA8\uB4DC \uC804\uD658 (\uC5EC\uAE30\uB97C \uB20C\uB7EC \uC804\uD658)"
+  }, mode === "admin" ? "📺" : "⚙️"));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));
 </script>
