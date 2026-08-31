@@ -311,48 +311,24 @@ function KartIllustration({size}){
     </svg>
   );
 }
-function GonggiIllustration({size}){
-  return (
-    <svg width={size} height={size} viewBox="0 0 120 120">
-      <g stroke="#0b3a63" strokeWidth="1.5">
-        <ellipse cx="35" cy="60" rx="12" ry="9" fill="#ff5c8a"/>
-        <ellipse cx="82" cy="55" rx="11" ry="9" fill="#7ee787"/>
-        <ellipse cx="45" cy="75" rx="14" ry="11" fill="#ff9f45"/>
-        <ellipse cx="70" cy="70" rx="13" ry="10" fill="#26e0d9"/>
-        <ellipse cx="58" cy="85" rx="13" ry="10" fill="#ffd166"/>
-      </g>
-      <g fill="#fff8ea" opacity=".9">
-        <path d="M92,28 l3,7 l7,3 l-7,3 l-3,7 l-3,-7 l-7,-3 l7,-3 Z"/>
-        <path d="M22,34 l2,5 l5,2 l-5,2 l-2,5 l-2,-5 l-5,-2 l5,-2 Z"/>
-      </g>
-    </svg>
-  );
-}
 function JumpRopeIllustration({size}){
-  return (
-    <svg width={size} height={size} viewBox="0 0 120 120">
-      <path d="M10,86 Q60,8 110,86" stroke="#e0542a" strokeWidth="7" fill="none" strokeLinecap="round"/>
-      <g strokeLinecap="round">
-        <circle cx="40" cy="55" r="10" fill="#ffd166" stroke="#0b3a63" strokeWidth="2"/>
-        <path d="M40,65 L33,90 M40,65 L47,90 M31,71 L20,61 M49,71 L60,61" stroke="#0b3a63" strokeWidth="4.5" fill="none"/>
-        <circle cx="80" cy="48" r="10" fill="#ff5c8a" stroke="#0b3a63" strokeWidth="2"/>
-        <path d="M80,58 L73,86 M80,58 L87,86 M71,64 L60,54 M89,64 L100,54" stroke="#0b3a63" strokeWidth="4.5" fill="none"/>
-      </g>
-    </svg>
-  );
+  return <img src={GAME_IMAGES.jumprope} alt="" style={{width:size, height:"auto"}} />;
+}
+function PingPongIllustration({size}){
+  return <img src={GAME_IMAGES.pingpong} alt="" style={{width:size, height:"auto"}} />;
 }
 function CurlingIllustration({size}){
   return <img src={GAME_IMAGES.curling} alt="" style={{width:size, height:"auto"}} />;
 }
 const ILLUSTRATIONS = {
-  jenga: JengaIllustration, kart: KartIllustration, gonggi: GonggiIllustration,
+  jenga: JengaIllustration, kart: KartIllustration, pingpong: PingPongIllustration,
   jumprope: JumpRopeIllustration, curling: CurlingIllustration,
 };
 /* which illustration(s) represent each day's game on the display screen */
 const DAY_ILLUSTRATIONS = {
   day1: [{ id:"jenga", label:"자이언트 젠가" }],
   day2: [{ id:"kart", label:"카트라이더" }],
-  day3: [{ id:"jumprope", label:"단체줄넘기" }, { id:"gonggi", label:"공기놀이" }],
+  day3: [{ id:"jumprope", label:"단체줄넘기" }, { id:"pingpong", label:"탁구공넣기" }],
   day4: [{ id:"curling", label:"컬링" }],
 };
 

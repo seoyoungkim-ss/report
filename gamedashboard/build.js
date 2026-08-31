@@ -52,6 +52,8 @@ const dataUri = (file) =>
 const gameImages = {
   jenga: dataUri("jenga.png"),
   curling: dataUri("curling.png"),
+  jumprope: dataUri("jumprope.png"),
+  pingpong: dataUri("pingpong.png"),
 };
 
 const { code: app } = babel.transform(jsx, {
