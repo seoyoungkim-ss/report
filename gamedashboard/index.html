@@ -90,6 +90,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .top9-rank{width:30px;text-align:center;font-weight:900;font-size:18px;color:var(--sub);}
 .top9-row.top3 .top9-rank{color:var(--orange2);}
 .top9-score{margin-left:auto;font-weight:900;font-size:18px;color:var(--cyan2);}
+.gold-count{font-size:12px;color:var(--gold);font-weight:800;flex:none;}
 
 /* ---------- admin ---------- */
 .admin-wrap{padding:20px 28px 80px;}
@@ -490,6 +491,15 @@ const DAYS = [{
 const dayInfo = k => DAYS.find(d => d.key === k);
 const STORAGE_KEY = "summer-escape-state-v1";
 const EXEC_MULTIPLIER = 2;
+/* Fixed scoring table, same for every game: 1등 5점 · 2등 4점 · 3등 3점 ·
+   4~6등 2점 · 7~9등 1점. RANK_POINTS[i] = points for exact finish rank i+1
+   (used by the ranking-format day, which has a full 1~9 order). For a
+   single-elimination bracket day there's no 3rd/4th playoff, so placement
+   collapses to 5 tiers by how far a team got — champion, runner-up, lost
+   semifinal, lost that round before it, lost the round before that — which
+   line up exactly with RANK_POINTS' 5 distinct values. */
+const RANK_POINTS = [5, 4, 3, 2, 2, 2, 1, 1, 1];
+const TIER_POINTS = [5, 4, 3, 2, 1];
 
 /* ============================== bracket utils ============================== */
 function buildBracket(teamIds) {
@@ -636,19 +646,15 @@ function createDefaultState() {
     },
     scoring: {
       day1: {
-        roundPoints: [10, 20, 30, 40],
         execTeams: []
       },
       day2: {
-        roundPoints: [10, 20, 30, 40],
         execTeams: []
       },
       day3: {
-        rankPoints: [100, 90, 80, 70, 60, 50, 40, 30, 20],
         execTeams: []
       },
       day4: {
-        roundPoints: [10, 20, 30, 40],
         execTeams: []
       }
     },
@@ -685,30 +691,66 @@ function getRankedEntries(day3) {
   }));
   return ranked;
 }
-function computeBracketScores(dayState, cfg) {
+/* Bracket placement has no 3rd-place playoff, so it collapses to 5 tiers
+   by the round a team was eliminated in (or champion, if never eliminated):
+   final winner / final loser / lost semifinal / lost the round before /
+   lost the round before that — TIER_POINTS' 5 values in order. Only
+   decided matches award points, so in-progress days show partial scores. */
+function computeBracketScores(dayState) {
   const scores = {};
-  dayState.bracket.rounds.forEach((round, r) => {
-    round.forEach(m => {
-      if (m.winnerId) scores[m.winnerId] = (scores[m.winnerId] || 0) + (cfg.roundPoints[r] || 0);
+  const bracket = dayState.bracket;
+  const numRounds = bracket.rounds.length;
+  bracket.rounds.forEach((round, r) => {
+    round.forEach((m, i) => {
+      if (!m.winnerId) return;
+      const isBye = m.meta && m.meta.auto;
+      if (isBye) return; // a walkover eliminates nobody
+      const aId = getSlotTeam(bracket, r, i, "A");
+      const bId = getSlotTeam(bracket, r, i, "B");
+      const loserId = m.winnerId === aId ? bId : aId;
+      if (r === numRounds - 1) {
+        scores[m.winnerId] = TIER_POINTS[0];
+        if (loserId) scores[loserId] = TIER_POINTS[1];
+      } else if (loserId) {
+        const tier = Math.min(numRounds - r, TIER_POINTS.length - 1);
+        scores[loserId] = TIER_POINTS[tier];
+      }
     });
   });
   return scores;
 }
-function computeRankingScores(dayState, cfg) {
+function computeRankingScores(dayState) {
   const scores = {};
   getRankedEntries(dayState).forEach(e => {
-    if (e.rank) scores[e.teamId] = cfg.rankPoints[e.rank - 1] || 0;
+    if (e.rank) scores[e.teamId] = RANK_POINTS[e.rank - 1] || 0;
   });
   return scores;
+}
+/* The team(s) awarded 1등 (5점) for a day, before any exec multiplier —
+   used only for the overall tie-break, never displayed as a score. */
+function firstPlaceTeamsOf(dayState, format) {
+  if (format === "ranking") {
+    return getRankedEntries(dayState).filter(e => e.rank === 1).map(e => e.teamId);
+  }
+  const bracket = dayState.bracket;
+  const final = bracket.rounds[bracket.rounds.length - 1][0];
+  return final.winnerId ? [final.winnerId] : [];
 }
 function computeOverall(state) {
   const perDay = {};
   const totals = {};
-  state.teams.forEach(t => totals[t.id] = 0);
+  const firstPlaceCount = {};
+  state.teams.forEach(t => {
+    totals[t.id] = 0;
+    firstPlaceCount[t.id] = 0;
+  });
   DAYS.forEach(d => {
     const ds = state.days[d.key],
       cfg = state.scoring[d.key];
-    let s = d.format === "ranking" ? computeRankingScores(ds, cfg) : computeBracketScores(ds, cfg);
+    let s = d.format === "ranking" ? computeRankingScores(ds) : computeBracketScores(ds);
+    firstPlaceTeamsOf(ds, d.format).forEach(id => {
+      firstPlaceCount[id] = (firstPlaceCount[id] || 0) + 1;
+    });
     const applied = {};
     state.teams.forEach(t => {
       let v = s[t.id] || 0;
@@ -721,8 +763,9 @@ function computeOverall(state) {
   return state.teams.map(t => ({
     ...t,
     total: Math.round(totals[t.id] * 10) / 10,
+    firstPlaceCount: firstPlaceCount[t.id],
     perDay: DAYS.map(d => Math.round((perDay[d.key][t.id] || 0) * 10) / 10)
-  })).sort((a, b) => b.total - a.total);
+  })).sort((a, b) => b.total - a.total || b.firstPlaceCount - a.firstPlaceCount);
 }
 
 /* ============================== misc utils ============================== */
@@ -1068,7 +1111,10 @@ function DisplayView({
   }, idx + 1), /*#__PURE__*/React.createElement(TeamChip, {
     team: t,
     exec: execTeamIds.includes(t.id)
-  }), /*#__PURE__*/React.createElement("div", {
+  }), t.firstPlaceCount > 0 && /*#__PURE__*/React.createElement("span", {
+    className: "gold-count",
+    title: "\uAC8C\uC784\uBCC4 1\uB4F1 \uD69F\uC218 (\uB3D9\uC810 \uC2DC \uC6B0\uC120\uC21C\uC704)"
+  }, "\uD83E\uDD47\xD7", t.firstPlaceCount), /*#__PURE__*/React.createElement("div", {
     className: "top9-score"
   }, t.total, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -1426,60 +1472,32 @@ function ScoringTab({
   state,
   update
 }) {
-  const setRoundPoints = (dayKey, idx, val) => update(s => {
-    s.scoring[dayKey].roundPoints[idx] = parseFloat(val) || 0;
-    return s;
-  });
-  const setRankPoints = (dayKey, idx, val) => update(s => {
-    s.scoring[dayKey].rankPoints[idx] = parseFloat(val) || 0;
-    return s;
-  });
   const toggleExec = (dayKey, teamId) => update(s => {
     const cfg = s.scoring[dayKey];
     const i = cfg.execTeams.indexOf(teamId);
     if (i >= 0) cfg.execTeams.splice(i, 1);else cfg.execTeams.push(teamId);
     return s;
   });
-  return /*#__PURE__*/React.createElement("div", null, DAYS.map(d => {
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("h3", null, "\uBC30\uC810 \uBC29\uC2DD (\uBAA8\uB4E0 Day \uACF5\uD1B5, \uACE0\uC815)"), /*#__PURE__*/React.createElement("table", {
+    className: "table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "1\uB4F1"), /*#__PURE__*/React.createElement("th", null, "2\uB4F1"), /*#__PURE__*/React.createElement("th", null, "3\uB4F1"), /*#__PURE__*/React.createElement("th", null, "4~6\uB4F1"), /*#__PURE__*/React.createElement("th", null, "7~9\uB4F1"))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "5\uC810"), /*#__PURE__*/React.createElement("td", null, "4\uC810"), /*#__PURE__*/React.createElement("td", null, "3\uC810"), /*#__PURE__*/React.createElement("td", null, "2\uC810"), /*#__PURE__*/React.createElement("td", null, "1\uC810")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--sub)",
+      marginTop: 8
+    }
+  }, "\uD1A0\uB108\uBA3C\uD2B8(Day1\xB72\xB74)\uB294 3\xB74\uC704 \uACB0\uC815\uC804\uC774 \uC5C6\uC5B4 \uC900\uACB0\uC2B9 \uD0C8\uB77D \uB450 \uD300\uC774 \uACF5\uB3D9 3\uB4F1\uC73C\uB85C \uACC4\uC0B0\uB429\uB2C8\uB2E4. \uC885\uD569 \uC810\uC218\uAC00 \uB3D9\uC77C\uD558\uBA74 ", /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: "var(--gold)"
+    }
+  }, "\uAC8C\uC784\uBCC4 1\uB4F1 \uD69F\uC218\uAC00 \uB9CE\uC740 \uD300"), "\uC774 \uC55E\uC12D\uB2C8\uB2E4.")), DAYS.map(d => {
     const cfg = state.scoring[d.key];
     return /*#__PURE__*/React.createElement("div", {
       className: "card",
       key: d.key
-    }, /*#__PURE__*/React.createElement("h3", null, d.label, " \xB7 ", d.game, " \uBC30\uC810 \uC124\uC815"), d.format === "bracket" ? /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 10,
-        flexWrap: "wrap",
-        marginBottom: 12
-      }
-    }, cfg.roundPoints.map((p, idx) => /*#__PURE__*/React.createElement("div", {
-      className: "field",
-      key: idx
-    }, /*#__PURE__*/React.createElement("label", null, idx + 1, "\uB77C\uC6B4\uB4DC \uD1B5\uACFC \uC810\uC218", idx === cfg.roundPoints.length - 1 ? " (우승)" : ""), /*#__PURE__*/React.createElement("input", {
-      type: "number",
-      defaultValue: p,
-      onBlur: e => setRoundPoints(d.key, idx, e.target.value),
-      style: {
-        width: 90
-      }
-    })))) : /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 10,
-        flexWrap: "wrap",
-        marginBottom: 12
-      }
-    }, cfg.rankPoints.map((p, idx) => /*#__PURE__*/React.createElement("div", {
-      className: "field",
-      key: idx
-    }, /*#__PURE__*/React.createElement("label", null, idx + 1, "\uC704 \uC810\uC218"), /*#__PURE__*/React.createElement("input", {
-      type: "number",
-      defaultValue: p,
-      onBlur: e => setRankPoints(d.key, idx, e.target.value),
-      style: {
-        width: 80
-      }
-    })))), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("h3", null, d.label, " \xB7 ", d.game), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: "var(--sub)",
@@ -1524,29 +1542,38 @@ function RulesTab({
 }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "card regulation"
-  }, /*#__PURE__*/React.createElement("h3", null, "\uBC30\uC810 \uADDC\uC815"), DAYS.map(d => {
+  }, /*#__PURE__*/React.createElement("h3", null, "\uBC30\uC810 \uADDC\uC815"), /*#__PURE__*/React.createElement("table", {
+    className: "table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "1\uB4F1"), /*#__PURE__*/React.createElement("th", null, "2\uB4F1"), /*#__PURE__*/React.createElement("th", null, "3\uB4F1"), /*#__PURE__*/React.createElement("th", null, "4~6\uB4F1"), /*#__PURE__*/React.createElement("th", null, "7~9\uB4F1"))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "5\uC810"), /*#__PURE__*/React.createElement("td", null, "4\uC810"), /*#__PURE__*/React.createElement("td", null, "3\uC810"), /*#__PURE__*/React.createElement("td", null, "2\uC810"), /*#__PURE__*/React.createElement("td", null, "1\uC810")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "var(--sub)",
+      marginTop: 6
+    }
+  }, "\uBAA8\uB4E0 Day(Day1~4) \uACF5\uD1B5 \uBC30\uC810\uC785\uB2C8\uB2E4. \uD1A0\uB108\uBA3C\uD2B8(Day1\xB72\xB74)\uB294 3\xB74\uC704 \uACB0\uC815\uC804\uC774 \uC5C6\uC5B4 \uC900\uACB0\uC2B9\uC5D0\uC11C \uD0C8\uB77D\uD55C \uB450 \uD300\uC774 \uACF5\uB3D9 3\uB4F1(3\uC810)\uC73C\uB85C, \uADF8 \uC774\uC804 \uB77C\uC6B4\uB4DC \uD0C8\uB77D \uD300\uB4E4\uC740 \uAC01\uAC01 4~6\uB4F1(2\uC810) \xB7 7~9\uB4F1(1\uC810) \uAD6C\uAC04\uC73C\uB85C \uACC4\uC0B0\uB429\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "var(--sub)",
+      marginTop: 6
+    }
+  }, /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: "var(--gold)"
+    }
+  }, "\uC885\uD569 \uC21C\uC704 \uB3D9\uC810\uC790 \uCC98\uB9AC"), ": \uC885\uD569 \uC810\uC218\uAC00 \uAC19\uC73C\uBA74 \uAC8C\uC784\uBCC4 1\uB4F1(\uC6B0\uC2B9/1\uC704) \uD69F\uC218\uAC00 \uB9CE\uC740 \uD300\uC774 \uC55E\uC12D\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("h4", null, "Day\uBCC4 \uC784\uC6D0 \uCC38\uC5EC \uAC00\uC911\uCE58"), DAYS.map(d => {
     const cfg = state.scoring[d.key];
     return /*#__PURE__*/React.createElement("div", {
-      key: d.key
-    }, /*#__PURE__*/React.createElement("h4", null, d.label, " \xB7 ", d.game), d.format === "bracket" ? /*#__PURE__*/React.createElement("table", {
-      className: "table"
-    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, cfg.roundPoints.map((_, i) => /*#__PURE__*/React.createElement("th", {
-      key: i
-    }, i + 1, "\uB77C\uC6B4\uB4DC \uD1B5\uACFC", i === cfg.roundPoints.length - 1 ? "(우승)" : "")))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, cfg.roundPoints.map((p, i) => /*#__PURE__*/React.createElement("td", {
-      key: i
-    }, p, "\uC810"))))) : /*#__PURE__*/React.createElement("table", {
-      className: "table"
-    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, cfg.rankPoints.map((_, i) => /*#__PURE__*/React.createElement("th", {
-      key: i
-    }, i + 1, "\uC704")))), /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, cfg.rankPoints.map((p, i) => /*#__PURE__*/React.createElement("td", {
-      key: i
-    }, p, "\uC810"))))), /*#__PURE__*/React.createElement("div", {
+      key: d.key,
       style: {
         fontSize: 13,
         color: "var(--sub)",
         marginTop: 4
       }
-    }, "\uC784\uC6D0 \uCC38\uC5EC \uC2DC \uD68D\uB4DD \uC810\uC218 \xD7 ", EXEC_MULTIPLIER, " \uC801\uC6A9 \xB7 \uB300\uC0C1\uD300: ", cfg.execTeams.length ? cfg.execTeams.map(id => state.teams.find(t => t.id === id)?.name).join(", ") : "없음"));
+    }, /*#__PURE__*/React.createElement("b", {
+      style: {
+        color: "var(--text)"
+      }
+    }, d.label, " \xB7 ", d.game), " \u2014 \uC784\uC6D0 \uCC38\uC5EC \uC2DC \uD68D\uB4DD \uC810\uC218 \xD7 ", EXEC_MULTIPLIER, " \uC801\uC6A9 \xB7 \uB300\uC0C1\uD300: ", cfg.execTeams.length ? cfg.execTeams.map(id => state.teams.find(t => t.id === id)?.name).join(", ") : "없음");
   }));
 }
 

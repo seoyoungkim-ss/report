@@ -88,6 +88,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .top9-rank{width:30px;text-align:center;font-weight:900;font-size:18px;color:var(--sub);}
 .top9-row.top3 .top9-rank{color:var(--orange2);}
 .top9-score{margin-left:auto;font-weight:900;font-size:18px;color:var(--cyan2);}
+.gold-count{font-size:12px;color:var(--gold);font-weight:800;flex:none;}
 
 /* ---------- admin ---------- */
 .admin-wrap{padding:20px 28px 80px;}

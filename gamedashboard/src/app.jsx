@@ -11,6 +11,15 @@ const DAYS = [
 const dayInfo = (k) => DAYS.find(d=>d.key===k);
 const STORAGE_KEY = "summer-escape-state-v1";
 const EXEC_MULTIPLIER = 2;
+/* Fixed scoring table, same for every game: 1등 5점 · 2등 4점 · 3등 3점 ·
+   4~6등 2점 · 7~9등 1점. RANK_POINTS[i] = points for exact finish rank i+1
+   (used by the ranking-format day, which has a full 1~9 order). For a
+   single-elimination bracket day there's no 3rd/4th playoff, so placement
+   collapses to 5 tiers by how far a team got — champion, runner-up, lost
+   semifinal, lost that round before it, lost the round before that — which
+   line up exactly with RANK_POINTS' 5 distinct values. */
+const RANK_POINTS = [5,4,3,2,2,2,1,1,1];
+const TIER_POINTS = [5,4,3,2,1];
 
 /* ============================== bracket utils ============================== */
 function buildBracket(teamIds){
@@ -104,10 +113,10 @@ function createDefaultState(){
       day4:{ bracket: buildBracket(teamIds) },
     },
     scoring:{
-      day1:{ roundPoints:[10,20,30,40], execTeams:[] },
-      day2:{ roundPoints:[10,20,30,40], execTeams:[] },
-      day3:{ rankPoints:[100,90,80,70,60,50,40,30,20], execTeams:[] },
-      day4:{ roundPoints:[10,20,30,40], execTeams:[] },
+      day1:{ execTeams:[] },
+      day2:{ execTeams:[] },
+      day3:{ execTeams:[] },
+      day4:{ execTeams:[] },
     },
     display:{ activeDayKey:"day1" },
   };
@@ -126,28 +135,59 @@ function getRankedEntries(day3){
   withoutTime.forEach(e=>ranked.push({teamId:e.teamId, rank:null, timeSec:null}));
   return ranked;
 }
-function computeBracketScores(dayState, cfg){
+/* Bracket placement has no 3rd-place playoff, so it collapses to 5 tiers
+   by the round a team was eliminated in (or champion, if never eliminated):
+   final winner / final loser / lost semifinal / lost the round before /
+   lost the round before that — TIER_POINTS' 5 values in order. Only
+   decided matches award points, so in-progress days show partial scores. */
+function computeBracketScores(dayState){
   const scores = {};
-  dayState.bracket.rounds.forEach((round, r)=>{
-    round.forEach(m=>{
-      if(m.winnerId) scores[m.winnerId] = (scores[m.winnerId]||0) + (cfg.roundPoints[r]||0);
+  const bracket = dayState.bracket;
+  const numRounds = bracket.rounds.length;
+  bracket.rounds.forEach((round, r)=>{
+    round.forEach((m,i)=>{
+      if(!m.winnerId) return;
+      const isBye = m.meta && m.meta.auto;
+      if(isBye) return; // a walkover eliminates nobody
+      const aId = getSlotTeam(bracket, r, i, "A");
+      const bId = getSlotTeam(bracket, r, i, "B");
+      const loserId = m.winnerId===aId ? bId : aId;
+      if(r === numRounds-1){
+        scores[m.winnerId] = TIER_POINTS[0];
+        if(loserId) scores[loserId] = TIER_POINTS[1];
+      } else if(loserId){
+        const tier = Math.min(numRounds - r, TIER_POINTS.length-1);
+        scores[loserId] = TIER_POINTS[tier];
+      }
     });
   });
   return scores;
 }
-function computeRankingScores(dayState, cfg){
+function computeRankingScores(dayState){
   const scores = {};
   getRankedEntries(dayState).forEach(e=>{
-    if(e.rank) scores[e.teamId] = cfg.rankPoints[e.rank-1]||0;
+    if(e.rank) scores[e.teamId] = RANK_POINTS[e.rank-1]||0;
   });
   return scores;
 }
+/* The team(s) awarded 1등 (5점) for a day, before any exec multiplier —
+   used only for the overall tie-break, never displayed as a score. */
+function firstPlaceTeamsOf(dayState, format){
+  if(format==="ranking"){
+    return getRankedEntries(dayState).filter(e=>e.rank===1).map(e=>e.teamId);
+  }
+  const bracket = dayState.bracket;
+  const final = bracket.rounds[bracket.rounds.length-1][0];
+  return final.winnerId ? [final.winnerId] : [];
+}
 function computeOverall(state){
   const perDay = {};
-  const totals = {}; state.teams.forEach(t=>totals[t.id]=0);
+  const totals = {}; const firstPlaceCount = {};
+  state.teams.forEach(t=>{ totals[t.id]=0; firstPlaceCount[t.id]=0; });
   DAYS.forEach(d=>{
     const ds = state.days[d.key], cfg = state.scoring[d.key];
-    let s = d.format==="ranking" ? computeRankingScores(ds,cfg) : computeBracketScores(ds,cfg);
+    let s = d.format==="ranking" ? computeRankingScores(ds) : computeBracketScores(ds);
+    firstPlaceTeamsOf(ds, d.format).forEach(id=>{ firstPlaceCount[id] = (firstPlaceCount[id]||0)+1; });
     const applied = {};
     state.teams.forEach(t=>{
       let v = s[t.id]||0;
@@ -158,8 +198,13 @@ function computeOverall(state){
     perDay[d.key] = applied;
   });
   return state.teams
-    .map(t=>({ ...t, total: Math.round(totals[t.id]*10)/10, perDay: DAYS.map(d=>Math.round((perDay[d.key][t.id]||0)*10)/10) }))
-    .sort((a,b)=>b.total-a.total);
+    .map(t=>({
+      ...t,
+      total: Math.round(totals[t.id]*10)/10,
+      firstPlaceCount: firstPlaceCount[t.id],
+      perDay: DAYS.map(d=>Math.round((perDay[d.key][t.id]||0)*10)/10),
+    }))
+    .sort((a,b)=> b.total-a.total || b.firstPlaceCount-a.firstPlaceCount);
 }
 
 /* ============================== misc utils ============================== */
@@ -403,6 +448,7 @@ function DisplayView({ state }){
               <div className={"top9-row" + (idx<3?" top3":"")} key={t.id}>
                 <div className="top9-rank">{idx+1}</div>
                 <TeamChip team={t} exec={execTeamIds.includes(t.id)} />
+                {t.firstPlaceCount>0 && <span className="gold-count" title="게임별 1등 횟수 (동점 시 우선순위)">🥇×{t.firstPlaceCount}</span>}
                 <div className="top9-score">{t.total}<span style={{fontSize:11,color:"var(--sub)",fontWeight:600}}> pt</span></div>
               </div>
             ))}
@@ -638,12 +684,6 @@ function TeamsTab({ state, update }){
 
 /* ============================== admin: scoring tab ============================== */
 function ScoringTab({ state, update }){
-  const setRoundPoints = (dayKey, idx, val)=> update(s=>{
-    s.scoring[dayKey].roundPoints[idx] = parseFloat(val)||0; return s;
-  });
-  const setRankPoints = (dayKey, idx, val)=> update(s=>{
-    s.scoring[dayKey].rankPoints[idx] = parseFloat(val)||0; return s;
-  });
   const toggleExec = (dayKey, teamId)=> update(s=>{
     const cfg = s.scoring[dayKey];
     const i = cfg.execTeams.indexOf(teamId);
@@ -653,30 +693,22 @@ function ScoringTab({ state, update }){
 
   return (
     <div>
+      <div className="card">
+        <h3>배점 방식 (모든 Day 공통, 고정)</h3>
+        <table className="table">
+          <thead><tr><th>1등</th><th>2등</th><th>3등</th><th>4~6등</th><th>7~9등</th></tr></thead>
+          <tbody><tr><td>5점</td><td>4점</td><td>3점</td><td>2점</td><td>1점</td></tr></tbody>
+        </table>
+        <div style={{fontSize:12,color:"var(--sub)",marginTop:8}}>
+          토너먼트(Day1·2·4)는 3·4위 결정전이 없어 준결승 탈락 두 팀이 공동 3등으로 계산됩니다.
+          종합 점수가 동일하면 <b style={{color:"var(--gold)"}}>게임별 1등 횟수가 많은 팀</b>이 앞섭니다.
+        </div>
+      </div>
       {DAYS.map(d=>{
         const cfg = state.scoring[d.key];
         return (
           <div className="card" key={d.key}>
-            <h3>{d.label} · {d.game} 배점 설정</h3>
-            {d.format==="bracket" ? (
-              <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:12}}>
-                {cfg.roundPoints.map((p,idx)=>(
-                  <div className="field" key={idx}>
-                    <label>{idx+1}라운드 통과 점수{idx===cfg.roundPoints.length-1?" (우승)":""}</label>
-                    <input type="number" defaultValue={p} onBlur={(e)=>setRoundPoints(d.key, idx, e.target.value)} style={{width:90}} />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:12}}>
-                {cfg.rankPoints.map((p,idx)=>(
-                  <div className="field" key={idx}>
-                    <label>{idx+1}위 점수</label>
-                    <input type="number" defaultValue={p} onBlur={(e)=>setRankPoints(d.key, idx, e.target.value)} style={{width:80}} />
-                  </div>
-                ))}
-              </div>
-            )}
+            <h3>{d.label} · {d.game}</h3>
             <div style={{fontSize:12,color:"var(--sub)",marginBottom:10}}>
               임원 참여 시 해당 팀의 {d.label} 획득 점수가 <b style={{color:"var(--gold)"}}>×{EXEC_MULTIPLIER}</b>로 계산됩니다.
             </div>
@@ -703,25 +735,26 @@ function RulesTab({ state }){
   return (
     <div className="card regulation">
       <h3>배점 규정</h3>
+      <table className="table">
+        <thead><tr><th>1등</th><th>2등</th><th>3등</th><th>4~6등</th><th>7~9등</th></tr></thead>
+        <tbody><tr><td>5점</td><td>4점</td><td>3점</td><td>2점</td><td>1점</td></tr></tbody>
+      </table>
+      <div style={{fontSize:13,color:"var(--sub)",marginTop:6}}>
+        모든 Day(Day1~4) 공통 배점입니다. 토너먼트(Day1·2·4)는 3·4위 결정전이 없어
+        준결승에서 탈락한 두 팀이 공동 3등(3점)으로, 그 이전 라운드 탈락 팀들은
+        각각 4~6등(2점) · 7~9등(1점) 구간으로 계산됩니다.
+      </div>
+      <div style={{fontSize:13,color:"var(--sub)",marginTop:6}}>
+        <b style={{color:"var(--gold)"}}>종합 순위 동점자 처리</b>: 종합 점수가 같으면 게임별 1등(우승/1위) 횟수가 많은 팀이 앞섭니다.
+      </div>
+
+      <h4>Day별 임원 참여 가중치</h4>
       {DAYS.map(d=>{
         const cfg = state.scoring[d.key];
         return (
-          <div key={d.key}>
-            <h4>{d.label} · {d.game}</h4>
-            {d.format==="bracket" ? (
-              <table className="table">
-                <thead><tr>{cfg.roundPoints.map((_,i)=><th key={i}>{i+1}라운드 통과{i===cfg.roundPoints.length-1?"(우승)":""}</th>)}</tr></thead>
-                <tbody><tr>{cfg.roundPoints.map((p,i)=><td key={i}>{p}점</td>)}</tr></tbody>
-              </table>
-            ) : (
-              <table className="table">
-                <thead><tr>{cfg.rankPoints.map((_,i)=><th key={i}>{i+1}위</th>)}</tr></thead>
-                <tbody><tr>{cfg.rankPoints.map((p,i)=><td key={i}>{p}점</td>)}</tr></tbody>
-              </table>
-            )}
-            <div style={{fontSize:13,color:"var(--sub)",marginTop:4}}>
-              임원 참여 시 획득 점수 × {EXEC_MULTIPLIER} 적용 · 대상팀: {cfg.execTeams.length ? cfg.execTeams.map(id=>state.teams.find(t=>t.id===id)?.name).join(", ") : "없음"}
-            </div>
+          <div key={d.key} style={{fontSize:13,color:"var(--sub)",marginTop:4}}>
+            <b style={{color:"var(--text)"}}>{d.label} · {d.game}</b> — 임원 참여 시 획득 점수 × {EXEC_MULTIPLIER} 적용 ·
+            대상팀: {cfg.execTeams.length ? cfg.execTeams.map(id=>state.teams.find(t=>t.id===id)?.name).join(", ") : "없음"}
           </div>
         );
       })}
