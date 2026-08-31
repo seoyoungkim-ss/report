@@ -287,6 +287,102 @@ function TeamChip({team, size, exec}){
   );
 }
 
+/* ============================== game illustrations (flat, transparent) ============================== */
+function JengaIllustration({size}){
+  return (
+    <svg width={size} height={size} viewBox="0 0 120 120">
+      <g stroke="#7a4a25" strokeWidth="1.5" strokeLinejoin="round">
+        <rect x="20" y="84" width="24" height="16" rx="2" fill="#d9a066"/>
+        <rect x="48" y="84" width="24" height="16" rx="2" fill="#d9a066"/>
+        <rect x="76" y="84" width="24" height="16" rx="2" fill="#d9a066"/>
+        <rect x="20" y="68" width="80" height="16" rx="2" fill="#c98f56"/>
+        <rect x="20" y="52" width="24" height="16" rx="2" fill="#d9a066"/>
+        <rect x="48" y="52" width="24" height="16" rx="2" fill="#d9a066"/>
+        <rect x="76" y="52" width="24" height="16" rx="2" fill="#d9a066"/>
+        <rect x="20" y="36" width="80" height="16" rx="2" fill="#c98f56"/>
+        <rect x="20" y="20" width="24" height="16" rx="2" fill="#d9a066"/>
+        <rect x="76" y="20" width="24" height="16" rx="2" fill="#d9a066"/>
+        <rect x="97" y="20" width="24" height="16" rx="2" fill="#f3c88a"/>
+      </g>
+    </svg>
+  );
+}
+function KartIllustration({size}){
+  return (
+    <svg width={size} height={size} viewBox="0 0 120 120">
+      <g strokeLinecap="round" opacity=".85">
+        <line x1="-4" y1="42" x2="12" y2="42" stroke="#eaf7ff" strokeWidth="4"/>
+        <line x1="-4" y1="58" x2="16" y2="58" stroke="#eaf7ff" strokeWidth="4"/>
+        <line x1="-4" y1="74" x2="10" y2="74" stroke="#eaf7ff" strokeWidth="4"/>
+      </g>
+      <path d="M15,80 Q15,63 36,61 L74,59 Q97,59 102,77 L102,86 Q102,91 97,91 L20,91 Q15,91 15,86 Z"
+        fill="#ff7a29" stroke="#7a3d00" strokeWidth="2" strokeLinejoin="round"/>
+      <rect x="90" y="55" width="12" height="12" rx="3" fill="#ff5c5c" stroke="#7a1010" strokeWidth="1.5"/>
+      <circle cx="64" cy="50" r="11" fill="#26e0d9" stroke="#0b3a63" strokeWidth="2"/>
+      <path d="M56,48 Q64,44 72,48" stroke="#0b3a63" strokeWidth="2" fill="none" strokeLinecap="round"/>
+      <circle cx="33" cy="92" r="13" fill="#22314f" stroke="#0b3a63" strokeWidth="1.5"/>
+      <circle cx="33" cy="92" r="5" fill="#cfd8e6"/>
+      <circle cx="86" cy="92" r="13" fill="#22314f" stroke="#0b3a63" strokeWidth="1.5"/>
+      <circle cx="86" cy="92" r="5" fill="#cfd8e6"/>
+    </svg>
+  );
+}
+function GonggiIllustration({size}){
+  return (
+    <svg width={size} height={size} viewBox="0 0 120 120">
+      <g stroke="#0b3a63" strokeWidth="1.5">
+        <ellipse cx="35" cy="60" rx="12" ry="9" fill="#ff5c8a"/>
+        <ellipse cx="82" cy="55" rx="11" ry="9" fill="#7ee787"/>
+        <ellipse cx="45" cy="75" rx="14" ry="11" fill="#ff9f45"/>
+        <ellipse cx="70" cy="70" rx="13" ry="10" fill="#26e0d9"/>
+        <ellipse cx="58" cy="85" rx="13" ry="10" fill="#ffd166"/>
+      </g>
+      <g fill="#fff8ea" opacity=".9">
+        <path d="M92,28 l3,7 l7,3 l-7,3 l-3,7 l-3,-7 l-7,-3 l7,-3 Z"/>
+        <path d="M22,34 l2,5 l5,2 l-5,2 l-2,5 l-2,-5 l-5,-2 l5,-2 Z"/>
+      </g>
+    </svg>
+  );
+}
+function JumpRopeIllustration({size}){
+  return (
+    <svg width={size} height={size} viewBox="0 0 120 120">
+      <path d="M10,86 Q60,8 110,86" stroke="#e0542a" strokeWidth="7" fill="none" strokeLinecap="round"/>
+      <g strokeLinecap="round">
+        <circle cx="40" cy="55" r="10" fill="#ffd166" stroke="#0b3a63" strokeWidth="2"/>
+        <path d="M40,65 L33,90 M40,65 L47,90 M31,71 L20,61 M49,71 L60,61" stroke="#0b3a63" strokeWidth="4.5" fill="none"/>
+        <circle cx="80" cy="48" r="10" fill="#ff5c8a" stroke="#0b3a63" strokeWidth="2"/>
+        <path d="M80,58 L73,86 M80,58 L87,86 M71,64 L60,54 M89,64 L100,54" stroke="#0b3a63" strokeWidth="4.5" fill="none"/>
+      </g>
+    </svg>
+  );
+}
+function CurlingIllustration({size}){
+  return (
+    <svg width={size} height={size} viewBox="0 0 120 120">
+      <g stroke="#eaf7ff" strokeWidth="3" strokeLinecap="round" opacity=".75" fill="none">
+        <path d="M6,68 Q30,66 46,72"/>
+        <path d="M8,80 Q32,79 48,83"/>
+      </g>
+      <circle cx="68" cy="74" r="28" fill="#8ba3c2" stroke="#3d5875" strokeWidth="2.5"/>
+      <circle cx="68" cy="74" r="19" fill="none" stroke="#dbe7f2" strokeWidth="2.5"/>
+      <rect x="60" y="38" width="16" height="18" rx="5" fill="#ff5c5c" stroke="#7a1010" strokeWidth="2"/>
+      <circle cx="68" cy="40" r="6" fill="#ff5c5c" stroke="#7a1010" strokeWidth="2"/>
+    </svg>
+  );
+}
+const ILLUSTRATIONS = {
+  jenga: JengaIllustration, kart: KartIllustration, gonggi: GonggiIllustration,
+  jumprope: JumpRopeIllustration, curling: CurlingIllustration,
+};
+/* which illustration(s) represent each day's game on the display screen */
+const DAY_ILLUSTRATIONS = {
+  day1: [{ id:"jenga", label:"자이언트 젠가" }],
+  day2: [{ id:"kart", label:"카트라이더" }],
+  day3: [{ id:"jumprope", label:"단체줄넘기" }, { id:"gonggi", label:"공기놀이" }],
+  day4: [{ id:"curling", label:"컬링" }],
+};
+
 /* ============================== bracket board ============================== */
 /* Rounds stack bottom-to-top: round 1 at the bottom, the final at the top. */
 function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra, execTeamIds }){
@@ -825,7 +921,8 @@ function App(){
     catch(e){ return "display"; }
   });
 
-  const isTeamBuildingDay = state && state.display && state.display.activeDayKey==="day3";
+  const heroGames = (mode==="display" && state) ? (DAY_ILLUSTRATIONS[state.display.activeDayKey] || []) : [];
+  const heroSize = heroGames.length>1 ? 165 : 220;
 
   return (
     <div className="app">
@@ -836,28 +933,17 @@ function App(){
         <span className="fest-palm fest-palm-l">🌴</span>
         <span className="fest-palm fest-palm-r">🌴</span>
 
-        {mode==="display" && <React.Fragment>
-          <div className="fest-sticker fest-sticker-gonggi">
-            <span className="badge-circle">🪨</span>
-            <span className="badge-label">공기놀이</span>
-          </div>
-          <div className="fest-sticker fest-sticker-jenga">
-            <span className="badge-circle">🧱</span>
-            <span className="badge-label">자이언트 젠가</span>
-          </div>
-          <div className={"fest-sticker fest-sticker-jump" + (isTeamBuildingDay ? " fest-sticker-jump-big" : "")}>
-            <span className="badge-circle">
-              <svg viewBox="0 0 100 100" width={isTeamBuildingDay ? 105 : 60} height={isTeamBuildingDay ? 105 : 60}>
-                <path d="M8,72 Q50,6 92,72" stroke="#e0542a" strokeWidth="6" fill="none" strokeLinecap="round"/>
-                <circle cx="34" cy="46" r="8" fill="#ffd166"/>
-                <path d="M34,54 L29,74 M34,54 L39,74 M27,59 L18,51 M41,59 L50,51" stroke="#0b3a63" strokeWidth="4" strokeLinecap="round" fill="none"/>
-                <circle cx="66" cy="40" r="8" fill="#ff5c8a"/>
-                <path d="M66,48 L61,72 M66,48 L71,72 M59,53 L50,45 M73,53 L82,45" stroke="#0b3a63" strokeWidth="4" strokeLinecap="round" fill="none"/>
-              </svg>
-            </span>
-            <span className="badge-label">단체줄넘기</span>
-          </div>
-        </React.Fragment>}
+        {heroGames.length>0 && <div className="fest-hero">
+          {heroGames.map(g=>{
+            const Illust = ILLUSTRATIONS[g.id];
+            return (
+              <div className="fest-hero-item" key={g.id}>
+                <Illust size={heroSize} />
+                <span className="label">{g.label}</span>
+              </div>
+            );
+          })}
+        </div>}
 
         <svg className="fest-wave" viewBox="0 0 1440 120" preserveAspectRatio="none">
           <path d="M0,45 C240,95 480,5 720,45 C960,85 1200,15 1440,55 L1440,120 L0,120 Z" fill="rgba(234,247,255,0.55)"/>

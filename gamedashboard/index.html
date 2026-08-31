@@ -34,22 +34,13 @@ body{background:var(--bg);color:var(--text);}
 .fest-palm-l{left:-26px;transform:scaleX(-1);}
 .fest-palm-r{right:-26px;}
 .fest-wave{position:absolute;left:0;right:0;bottom:0;width:100%;height:110px;}
-/* little game-illustration stickers, poster-style */
-.fest-sticker{position:absolute;display:flex;flex-direction:column;align-items:center;gap:6px;}
-.fest-sticker .badge-circle{width:96px;height:96px;border-radius:50%;background:#fff8ea;
-  border:4px dashed rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;
-  font-size:46px;line-height:1;box-shadow:0 10px 22px rgba(4,20,40,.28);transform:rotate(var(--tilt,-6deg));}
-.fest-sticker .badge-label{background:#fff;color:#0b3a63;font-size:12px;font-weight:900;
-  padding:3px 12px;border-radius:999px;box-shadow:0 5px 12px rgba(4,20,40,.22);
-  transform:rotate(var(--tilt,-6deg));white-space:nowrap;}
-.fest-sticker-gonggi{bottom:210px;left:1.5%;--tilt:-8deg;}
-.fest-sticker-jenga{bottom:210px;right:1.5%;--tilt:7deg;}
-.fest-sticker-jenga .badge-circle{width:150px;height:150px;font-size:76px;}
-.fest-sticker-jenga .badge-label{font-size:14px;padding:4px 14px;}
-.fest-sticker-jump{bottom:96px;left:50%;transform:translateX(-50%);--tilt:-4deg;}
-.fest-sticker-jump-big{bottom:90px;--tilt:-3deg;}
-.fest-sticker-jump-big .badge-circle{width:210px;height:210px;}
-.fest-sticker-jump-big .badge-label{font-size:17px;padding:6px 20px;}
+/* today's game illustration(s) — flat, no card/backdrop, just the artwork */
+.fest-hero{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);
+  display:flex;gap:36px;align-items:flex-end;justify-content:center;}
+.fest-hero-item{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.fest-hero-item svg{filter:drop-shadow(0 12px 20px rgba(4,20,40,.32));}
+.fest-hero-item .label{color:#fff;font-weight:900;font-size:15px;letter-spacing:.5px;
+  text-shadow:0 2px 8px rgba(4,20,40,.45);white-space:nowrap;}
 button{font-family:inherit;cursor:pointer;}
 input,select{font-family:inherit;}
 ::-webkit-scrollbar{width:10px;height:10px;}
@@ -920,6 +911,351 @@ function TeamChip({
   }, "\u26A1\xD7", EXEC_MULTIPLIER));
 }
 
+/* ============================== game illustrations (flat, transparent) ============================== */
+function JengaIllustration({
+  size
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 120 120"
+  }, /*#__PURE__*/React.createElement("g", {
+    stroke: "#7a4a25",
+    strokeWidth: "1.5",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "20",
+    y: "84",
+    width: "24",
+    height: "16",
+    rx: "2",
+    fill: "#d9a066"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "48",
+    y: "84",
+    width: "24",
+    height: "16",
+    rx: "2",
+    fill: "#d9a066"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "76",
+    y: "84",
+    width: "24",
+    height: "16",
+    rx: "2",
+    fill: "#d9a066"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "20",
+    y: "68",
+    width: "80",
+    height: "16",
+    rx: "2",
+    fill: "#c98f56"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "20",
+    y: "52",
+    width: "24",
+    height: "16",
+    rx: "2",
+    fill: "#d9a066"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "48",
+    y: "52",
+    width: "24",
+    height: "16",
+    rx: "2",
+    fill: "#d9a066"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "76",
+    y: "52",
+    width: "24",
+    height: "16",
+    rx: "2",
+    fill: "#d9a066"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "20",
+    y: "36",
+    width: "80",
+    height: "16",
+    rx: "2",
+    fill: "#c98f56"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "20",
+    y: "20",
+    width: "24",
+    height: "16",
+    rx: "2",
+    fill: "#d9a066"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "76",
+    y: "20",
+    width: "24",
+    height: "16",
+    rx: "2",
+    fill: "#d9a066"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "97",
+    y: "20",
+    width: "24",
+    height: "16",
+    rx: "2",
+    fill: "#f3c88a"
+  })));
+}
+function KartIllustration({
+  size
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 120 120"
+  }, /*#__PURE__*/React.createElement("g", {
+    strokeLinecap: "round",
+    opacity: ".85"
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: "-4",
+    y1: "42",
+    x2: "12",
+    y2: "42",
+    stroke: "#eaf7ff",
+    strokeWidth: "4"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "-4",
+    y1: "58",
+    x2: "16",
+    y2: "58",
+    stroke: "#eaf7ff",
+    strokeWidth: "4"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "-4",
+    y1: "74",
+    x2: "10",
+    y2: "74",
+    stroke: "#eaf7ff",
+    strokeWidth: "4"
+  })), /*#__PURE__*/React.createElement("path", {
+    d: "M15,80 Q15,63 36,61 L74,59 Q97,59 102,77 L102,86 Q102,91 97,91 L20,91 Q15,91 15,86 Z",
+    fill: "#ff7a29",
+    stroke: "#7a3d00",
+    strokeWidth: "2",
+    strokeLinejoin: "round"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "90",
+    y: "55",
+    width: "12",
+    height: "12",
+    rx: "3",
+    fill: "#ff5c5c",
+    stroke: "#7a1010",
+    strokeWidth: "1.5"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "64",
+    cy: "50",
+    r: "11",
+    fill: "#26e0d9",
+    stroke: "#0b3a63",
+    strokeWidth: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M56,48 Q64,44 72,48",
+    stroke: "#0b3a63",
+    strokeWidth: "2",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "33",
+    cy: "92",
+    r: "13",
+    fill: "#22314f",
+    stroke: "#0b3a63",
+    strokeWidth: "1.5"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "33",
+    cy: "92",
+    r: "5",
+    fill: "#cfd8e6"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "86",
+    cy: "92",
+    r: "13",
+    fill: "#22314f",
+    stroke: "#0b3a63",
+    strokeWidth: "1.5"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "86",
+    cy: "92",
+    r: "5",
+    fill: "#cfd8e6"
+  }));
+}
+function GonggiIllustration({
+  size
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 120 120"
+  }, /*#__PURE__*/React.createElement("g", {
+    stroke: "#0b3a63",
+    strokeWidth: "1.5"
+  }, /*#__PURE__*/React.createElement("ellipse", {
+    cx: "35",
+    cy: "60",
+    rx: "12",
+    ry: "9",
+    fill: "#ff5c8a"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "82",
+    cy: "55",
+    rx: "11",
+    ry: "9",
+    fill: "#7ee787"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "45",
+    cy: "75",
+    rx: "14",
+    ry: "11",
+    fill: "#ff9f45"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "70",
+    cy: "70",
+    rx: "13",
+    ry: "10",
+    fill: "#26e0d9"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "58",
+    cy: "85",
+    rx: "13",
+    ry: "10",
+    fill: "#ffd166"
+  })), /*#__PURE__*/React.createElement("g", {
+    fill: "#fff8ea",
+    opacity: ".9"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M92,28 l3,7 l7,3 l-7,3 l-3,7 l-3,-7 l-7,-3 l7,-3 Z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M22,34 l2,5 l5,2 l-5,2 l-2,5 l-2,-5 l-5,-2 l5,-2 Z"
+  })));
+}
+function JumpRopeIllustration({
+  size
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 120 120"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M10,86 Q60,8 110,86",
+    stroke: "#e0542a",
+    strokeWidth: "7",
+    fill: "none",
+    strokeLinecap: "round"
+  }), /*#__PURE__*/React.createElement("g", {
+    strokeLinecap: "round"
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "40",
+    cy: "55",
+    r: "10",
+    fill: "#ffd166",
+    stroke: "#0b3a63",
+    strokeWidth: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M40,65 L33,90 M40,65 L47,90 M31,71 L20,61 M49,71 L60,61",
+    stroke: "#0b3a63",
+    strokeWidth: "4.5",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "80",
+    cy: "48",
+    r: "10",
+    fill: "#ff5c8a",
+    stroke: "#0b3a63",
+    strokeWidth: "2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M80,58 L73,86 M80,58 L87,86 M71,64 L60,54 M89,64 L100,54",
+    stroke: "#0b3a63",
+    strokeWidth: "4.5",
+    fill: "none"
+  })));
+}
+function CurlingIllustration({
+  size
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 120 120"
+  }, /*#__PURE__*/React.createElement("g", {
+    stroke: "#eaf7ff",
+    strokeWidth: "3",
+    strokeLinecap: "round",
+    opacity: ".75",
+    fill: "none"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M6,68 Q30,66 46,72"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M8,80 Q32,79 48,83"
+  })), /*#__PURE__*/React.createElement("circle", {
+    cx: "68",
+    cy: "74",
+    r: "28",
+    fill: "#8ba3c2",
+    stroke: "#3d5875",
+    strokeWidth: "2.5"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "68",
+    cy: "74",
+    r: "19",
+    fill: "none",
+    stroke: "#dbe7f2",
+    strokeWidth: "2.5"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "60",
+    y: "38",
+    width: "16",
+    height: "18",
+    rx: "5",
+    fill: "#ff5c5c",
+    stroke: "#7a1010",
+    strokeWidth: "2"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "68",
+    cy: "40",
+    r: "6",
+    fill: "#ff5c5c",
+    stroke: "#7a1010",
+    strokeWidth: "2"
+  }));
+}
+const ILLUSTRATIONS = {
+  jenga: JengaIllustration,
+  kart: KartIllustration,
+  gonggi: GonggiIllustration,
+  jumprope: JumpRopeIllustration,
+  curling: CurlingIllustration
+};
+/* which illustration(s) represent each day's game on the display screen */
+const DAY_ILLUSTRATIONS = {
+  day1: [{
+    id: "jenga",
+    label: "자이언트 젠가"
+  }],
+  day2: [{
+    id: "kart",
+    label: "카트라이더"
+  }],
+  day3: [{
+    id: "jumprope",
+    label: "단체줄넘기"
+  }, {
+    id: "gonggi",
+    label: "공기놀이"
+  }],
+  day4: [{
+    id: "curling",
+    label: "컬링"
+  }]
+};
+
 /* ============================== bracket board ============================== */
 /* Rounds stack bottom-to-top: round 1 at the bottom, the final at the top. */
 function BracketBoard({
@@ -1744,7 +2080,8 @@ function App() {
       return "display";
     }
   });
-  const isTeamBuildingDay = state && state.display && state.display.activeDayKey === "day3";
+  const heroGames = mode === "display" && state ? DAY_ILLUSTRATIONS[state.display.activeDayKey] || [] : [];
+  const heroSize = heroGames.length > 1 ? 165 : 220;
   return /*#__PURE__*/React.createElement("div", {
     className: "app"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1760,57 +2097,19 @@ function App() {
     className: "fest-palm fest-palm-l"
   }, "\uD83C\uDF34"), /*#__PURE__*/React.createElement("span", {
     className: "fest-palm fest-palm-r"
-  }, "\uD83C\uDF34"), mode === "display" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "fest-sticker fest-sticker-gonggi"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "badge-circle"
-  }, "\uD83E\uDEA8"), /*#__PURE__*/React.createElement("span", {
-    className: "badge-label"
-  }, "\uACF5\uAE30\uB180\uC774")), /*#__PURE__*/React.createElement("div", {
-    className: "fest-sticker fest-sticker-jenga"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "badge-circle"
-  }, "\uD83E\uDDF1"), /*#__PURE__*/React.createElement("span", {
-    className: "badge-label"
-  }, "\uC790\uC774\uC5B8\uD2B8 \uC820\uAC00")), /*#__PURE__*/React.createElement("div", {
-    className: "fest-sticker fest-sticker-jump" + (isTeamBuildingDay ? " fest-sticker-jump-big" : "")
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "badge-circle"
-  }, /*#__PURE__*/React.createElement("svg", {
-    viewBox: "0 0 100 100",
-    width: isTeamBuildingDay ? 105 : 60,
-    height: isTeamBuildingDay ? 105 : 60
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M8,72 Q50,6 92,72",
-    stroke: "#e0542a",
-    strokeWidth: "6",
-    fill: "none",
-    strokeLinecap: "round"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "34",
-    cy: "46",
-    r: "8",
-    fill: "#ffd166"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M34,54 L29,74 M34,54 L39,74 M27,59 L18,51 M41,59 L50,51",
-    stroke: "#0b3a63",
-    strokeWidth: "4",
-    strokeLinecap: "round",
-    fill: "none"
-  }), /*#__PURE__*/React.createElement("circle", {
-    cx: "66",
-    cy: "40",
-    r: "8",
-    fill: "#ff5c8a"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M66,48 L61,72 M66,48 L71,72 M59,53 L50,45 M73,53 L82,45",
-    stroke: "#0b3a63",
-    strokeWidth: "4",
-    strokeLinecap: "round",
-    fill: "none"
-  }))), /*#__PURE__*/React.createElement("span", {
-    className: "badge-label"
-  }, "\uB2E8\uCCB4\uC904\uB118\uAE30"))), /*#__PURE__*/React.createElement("svg", {
+  }, "\uD83C\uDF34"), heroGames.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "fest-hero"
+  }, heroGames.map(g => {
+    const Illust = ILLUSTRATIONS[g.id];
+    return /*#__PURE__*/React.createElement("div", {
+      className: "fest-hero-item",
+      key: g.id
+    }, /*#__PURE__*/React.createElement(Illust, {
+      size: heroSize
+    }), /*#__PURE__*/React.createElement("span", {
+      className: "label"
+    }, g.label));
+  })), /*#__PURE__*/React.createElement("svg", {
     className: "fest-wave",
     viewBox: "0 0 1440 120",
     preserveAspectRatio: "none"

@@ -26,22 +26,13 @@ body{background:var(--bg);color:var(--text);}
 .fest-palm-l{left:-26px;transform:scaleX(-1);}
 .fest-palm-r{right:-26px;}
 .fest-wave{position:absolute;left:0;right:0;bottom:0;width:100%;height:110px;}
-/* little game-illustration stickers, poster-style */
-.fest-sticker{position:absolute;display:flex;flex-direction:column;align-items:center;gap:6px;}
-.fest-sticker .badge-circle{width:96px;height:96px;border-radius:50%;background:#fff8ea;
-  border:4px dashed rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;
-  font-size:46px;line-height:1;box-shadow:0 10px 22px rgba(4,20,40,.28);transform:rotate(var(--tilt,-6deg));}
-.fest-sticker .badge-label{background:#fff;color:#0b3a63;font-size:12px;font-weight:900;
-  padding:3px 12px;border-radius:999px;box-shadow:0 5px 12px rgba(4,20,40,.22);
-  transform:rotate(var(--tilt,-6deg));white-space:nowrap;}
-.fest-sticker-gonggi{bottom:210px;left:1.5%;--tilt:-8deg;}
-.fest-sticker-jenga{bottom:210px;right:1.5%;--tilt:7deg;}
-.fest-sticker-jenga .badge-circle{width:150px;height:150px;font-size:76px;}
-.fest-sticker-jenga .badge-label{font-size:14px;padding:4px 14px;}
-.fest-sticker-jump{bottom:96px;left:50%;transform:translateX(-50%);--tilt:-4deg;}
-.fest-sticker-jump-big{bottom:90px;--tilt:-3deg;}
-.fest-sticker-jump-big .badge-circle{width:210px;height:210px;}
-.fest-sticker-jump-big .badge-label{font-size:17px;padding:6px 20px;}
+/* today's game illustration(s) — flat, no card/backdrop, just the artwork */
+.fest-hero{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);
+  display:flex;gap:36px;align-items:flex-end;justify-content:center;}
+.fest-hero-item{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.fest-hero-item svg{filter:drop-shadow(0 12px 20px rgba(4,20,40,.32));}
+.fest-hero-item .label{color:#fff;font-weight:900;font-size:15px;letter-spacing:.5px;
+  text-shadow:0 2px 8px rgba(4,20,40,.45);white-space:nowrap;}
 button{font-family:inherit;cursor:pointer;}
 input,select{font-family:inherit;}
 ::-webkit-scrollbar{width:10px;height:10px;}
