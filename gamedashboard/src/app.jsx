@@ -895,7 +895,7 @@ function App(){
   });
 
   const heroGames = (mode==="display" && state) ? (DAY_ILLUSTRATIONS[state.display.activeDayKey] || []) : [];
-  const heroSize = heroGames.length>1 ? 165 : 220;
+  const heroSize = heroGames.length>1 ? 190 : 280;
 
   return (
     <div className="app">
