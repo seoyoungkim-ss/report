@@ -45,6 +45,15 @@ const fonts = [
   fontFace(900, "Pretendard-Black.woff2"),
 ].join("\n");
 
+const dataUri = (file) =>
+  `data:image/png;base64,${fs
+    .readFileSync(path.join(dir, "src/images", file))
+    .toString("base64")}`;
+const gameImages = {
+  jenga: dataUri("jenga.png"),
+  curling: dataUri("curling.png"),
+};
+
 const { code: app } = babel.transform(jsx, {
   presets: ["@babel/preset-react"],
   filename: "app.jsx",
@@ -64,6 +73,10 @@ ${react}
 <script>
 /* ReactDOM 18 (production, bundled offline — no network required) */
 ${reactDom}
+</script>
+<script>
+/* game illustration images, embedded offline */
+const GAME_IMAGES = ${JSON.stringify(gameImages)};
 </script>
 <script>
 ${app}

@@ -30,7 +30,7 @@ body{background:var(--bg);color:var(--text);}
 .fest-hero{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);
   display:flex;gap:36px;align-items:flex-end;justify-content:center;}
 .fest-hero-item{display:flex;flex-direction:column;align-items:center;gap:8px;}
-.fest-hero-item svg{filter:drop-shadow(0 12px 20px rgba(4,20,40,.32));}
+.fest-hero-item svg,.fest-hero-item img{filter:drop-shadow(0 12px 20px rgba(4,20,40,.32));}
 .fest-hero-item .label{color:#fff;font-weight:900;font-size:15px;letter-spacing:.5px;
   text-shadow:0 2px 8px rgba(4,20,40,.45);white-space:nowrap;}
 button{font-family:inherit;cursor:pointer;}

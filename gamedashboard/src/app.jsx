@@ -289,23 +289,7 @@ function TeamChip({team, size, exec}){
 
 /* ============================== game illustrations (flat, transparent) ============================== */
 function JengaIllustration({size}){
-  return (
-    <svg width={size} height={size} viewBox="0 0 120 120">
-      <g stroke="#7a4a25" strokeWidth="1.5" strokeLinejoin="round">
-        <rect x="20" y="84" width="24" height="16" rx="2" fill="#d9a066"/>
-        <rect x="48" y="84" width="24" height="16" rx="2" fill="#d9a066"/>
-        <rect x="76" y="84" width="24" height="16" rx="2" fill="#d9a066"/>
-        <rect x="20" y="68" width="80" height="16" rx="2" fill="#c98f56"/>
-        <rect x="20" y="52" width="24" height="16" rx="2" fill="#d9a066"/>
-        <rect x="48" y="52" width="24" height="16" rx="2" fill="#d9a066"/>
-        <rect x="76" y="52" width="24" height="16" rx="2" fill="#d9a066"/>
-        <rect x="20" y="36" width="80" height="16" rx="2" fill="#c98f56"/>
-        <rect x="20" y="20" width="24" height="16" rx="2" fill="#d9a066"/>
-        <rect x="76" y="20" width="24" height="16" rx="2" fill="#d9a066"/>
-        <rect x="97" y="20" width="24" height="16" rx="2" fill="#f3c88a"/>
-      </g>
-    </svg>
-  );
+  return <img src={GAME_IMAGES.jenga} alt="" style={{width:size, height:"auto"}} />;
 }
 function KartIllustration({size}){
   return (
@@ -358,18 +342,7 @@ function JumpRopeIllustration({size}){
   );
 }
 function CurlingIllustration({size}){
-  return (
-    <svg width={size} height={size} viewBox="0 0 120 120">
-      <g stroke="#eaf7ff" strokeWidth="3" strokeLinecap="round" opacity=".75" fill="none">
-        <path d="M6,68 Q30,66 46,72"/>
-        <path d="M8,80 Q32,79 48,83"/>
-      </g>
-      <circle cx="68" cy="74" r="28" fill="#8ba3c2" stroke="#3d5875" strokeWidth="2.5"/>
-      <circle cx="68" cy="74" r="19" fill="none" stroke="#dbe7f2" strokeWidth="2.5"/>
-      <rect x="60" y="38" width="16" height="18" rx="5" fill="#ff5c5c" stroke="#7a1010" strokeWidth="2"/>
-      <circle cx="68" cy="40" r="6" fill="#ff5c5c" stroke="#7a1010" strokeWidth="2"/>
-    </svg>
-  );
+  return <img src={GAME_IMAGES.curling} alt="" style={{width:size, height:"auto"}} />;
 }
 const ILLUSTRATIONS = {
   jenga: JengaIllustration, kart: KartIllustration, gonggi: GonggiIllustration,
