@@ -342,7 +342,7 @@ const DAY_ILLUSTRATIONS = {
 
 /* ============================== bracket board ============================== */
 /* Rounds stack bottom-to-top: round 1 at the bottom, the final at the top. */
-function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra, execTeamIds }){
+function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner, renderExtra, execTeamIds }){
   const containerRef = useRef(null);
   const matchRefs = useRef({});
   const [lines, setLines] = useState([]);
@@ -426,8 +426,16 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra, 
                   if(changing && !window.confirm("정말 변경하시겠습니까? 다음 라운드에 반영된 결과도 함께 초기화됩니다.")) return;
                   onSetWinner(r, i, teamId);
                 };
+                const canReset = editable && !isBye && m.winnerId;
+                const resetWinner = (e)=>{
+                  e.stopPropagation();
+                  if(!window.confirm("승자를 초기화할까요? 다음 라운드에 반영된 결과도 함께 초기화됩니다.")) return;
+                  onResetWinner(r, i);
+                };
                 return (
                   <div className={"match" + (m.winnerId?" decided":"")} key={m.id} ref={setRef(r,i)}>
+                    {canReset &&
+                      <button className="match-reset-btn" onClick={resetWinner} title="승자 초기화">↺</button>}
                     {canPick ? (
                       <button className="slot-btn" onClick={()=>pick(aId)}>
                         <span className={rowClass(aId)} style={{width:"100%"}}><TeamChip team={aTeam} exec={isExec(aId)} /></span>
@@ -442,10 +450,6 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra, 
                     ) : (
                       <div className={rowClass(bId) + (!bTeam?" tbd":"")}><TeamChip team={bTeam} exec={isExec(bId)} /></div>
                     )}
-                    {m.meta && m.meta.firstMoverId && teamsById[m.meta.firstMoverId] &&
-                      <div className="match-meta">{m.meta.firstMoverLabel||"선공"}: <b>{teamsById[m.meta.firstMoverId].name}</b></div>}
-                    {m.meta && m.meta.setScore &&
-                      <div className="match-meta">세트 스코어: <b>{m.meta.setScore}</b></div>}
                     {renderExtra && aTeam && bTeam && !isBye && renderExtra(m, r, i)}
                   </div>
                 );
@@ -481,7 +485,7 @@ function RankingBoard({ day3, teamsById, execTeamIds }){
 }
 
 /* ============================== display view ============================== */
-function DisplayView({ state }){
+function DisplayView({ state, update }){
   const teamsById = useMemo(()=>Object.fromEntries(state.teams.map(t=>[t.id,t])),[state.teams]);
   const activeKey = state.display.activeDayKey;
   const info = dayInfo(activeKey);
@@ -522,7 +526,7 @@ function DisplayView({ state }){
         </div>
         <div className="today-panel-full">
           {info.format==="bracket"
-            ? <BracketBoard bracket={state.days[activeKey].bracket} teamsById={teamsById} editable={false} onSetWinner={()=>{}} execTeamIds={execTeamIds} />
+            ? <InteractiveBracketSection dayKey={activeKey} state={state} update={update} teamsById={teamsById} />
             : <RankingBoard day3={state.days.day3} teamsById={teamsById} execTeamIds={execTeamIds} />}
         </div>
       </div>
@@ -532,21 +536,121 @@ function DisplayView({ state }){
 
 /* ============================== admin: day1 first-mover picker ============================== */
 /* Admin just picks who goes first directly — the timer itself is run outside the app. */
-function FirstMoverPicker({ match, onUpdate, teamsById, aId, bId }){
+function FirstMoverPicker({ match, onUpdate, onReset, teamsById, aId, bId }){
   const current = match.meta && match.meta.firstMoverId;
   const pick = (teamId)=> onUpdate({ firstMoverId: teamId, firstMoverLabel: "선공" });
   return (
-    <div className="stopwatch-box" onClick={e=>e.stopPropagation()}>
-      <div style={{fontSize:11,color:"var(--sub)",fontWeight:700,marginBottom:6}}>선공 팀 선택</div>
-      <div className="stopwatch-row">
-        <button className={"small-btn" + (current===aId?" primary":"")} onClick={()=>pick(aId)}>
-          {teamsById[aId] && teamsById[aId].name} 선공
+    <div className="mini-widget" onClick={e=>e.stopPropagation()}>
+      <div className="mini-widget-row">
+        <span className="mini-label">선공</span>
+        <button className={"mini-pick" + (current===aId?" active":"")} onClick={()=>pick(aId)}>
+          {teamsById[aId] && teamsById[aId].name}
         </button>
-        <button className={"small-btn" + (current===bId?" primary":"")} onClick={()=>pick(bId)}>
-          {teamsById[bId] && teamsById[bId].name} 선공
+        <button className={"mini-pick" + (current===bId?" active":"")} onClick={()=>pick(bId)}>
+          {teamsById[bId] && teamsById[bId].name}
         </button>
+        {current &&
+          <button className="mini-reset" title="선공 초기화" onClick={()=>{ if(window.confirm("선공 기록을 초기화할까요?")) onReset(); }}>↺</button>}
       </div>
     </div>
+  );
+}
+
+/* ============================== day2: set-score picker (3판 2선승) ============================== */
+/* Entering the set score decides the match automatically — first to 2 wins. */
+function SetScorePicker({ match, onUpdate, onWinner, onReset, aId, bId }){
+  const setA = (match.meta && match.meta.setA) || 0;
+  const setB = (match.meta && match.meta.setB) || 0;
+  const bump = (side, delta)=>{
+    let a = setA, b = setB;
+    if(side==="A") a = Math.max(0, Math.min(2, a+delta));
+    else b = Math.max(0, Math.min(2, b+delta));
+    onUpdate({ setA:a, setB:b, setScore:`${a}:${b}` });
+    if(a===2 && b<2) onWinner(aId);
+    else if(b===2 && a<2) onWinner(bId);
+  };
+  return (
+    <div className="mini-widget" onClick={e=>e.stopPropagation()}>
+      <div className="mini-widget-row">
+        <span className="mini-label">세트</span>
+        <button className="mini-stepper-btn" onClick={()=>bump("A",-1)}>－</button>
+        <span className="mini-num">{setA}</span>
+        <button className="mini-stepper-btn" onClick={()=>bump("A",1)}>＋</button>
+        <span className="mini-colon">:</span>
+        <button className="mini-stepper-btn" onClick={()=>bump("B",-1)}>－</button>
+        <span className="mini-num">{setB}</span>
+        <button className="mini-stepper-btn" onClick={()=>bump("B",1)}>＋</button>
+        {(setA>0 || setB>0) &&
+          <button className="mini-reset" title="점수 초기화" onClick={()=>{ if(window.confirm("세트 스코어를 초기화할까요? (승자는 별도로 초기화해야 합니다)")) onReset(); }}>↺</button>}
+      </div>
+    </div>
+  );
+}
+
+/* ============================== interactive bracket (shared: admin + display) ============================== */
+/* Winner picking, first-mover, set-score and their resets — used both in the
+   admin tab and directly on the display screen, since flipping into admin
+   mode for every single match update isn't practical during a live event. */
+function InteractiveBracketSection({ dayKey, state, update, teamsById }){
+  const info = dayInfo(dayKey);
+  const dayState = state.days[dayKey];
+  const execTeamIds = state.scoring[dayKey].execTeams;
+
+  const setWinner = (r,i,teamId)=> update(s=>{
+    const b = s.days[dayKey].bracket;
+    const m = b.rounds[r][i];
+    if(m.winnerId===teamId) return null;
+    m.winnerId = teamId;
+    clearDownstream(b, r, i);
+    return s;
+  });
+  const resetWinner = (r,i)=> update(s=>{
+    const b = s.days[dayKey].bracket;
+    const m = b.rounds[r][i];
+    if(!m.winnerId) return null;
+    m.winnerId = null;
+    clearDownstream(b, r, i);
+    return s;
+  });
+  const setMeta = (r,i,patch)=> update(s=>{
+    const m = s.days[dayKey].bracket.rounds[r][i];
+    m.meta = { ...m.meta, ...patch };
+    return s;
+  });
+  const resetMeta = (r,i,keys)=> update(s=>{
+    const m = s.days[dayKey].bracket.rounds[r][i];
+    const meta = { ...m.meta };
+    keys.forEach(k=>delete meta[k]);
+    m.meta = meta;
+    return s;
+  });
+
+  return (
+    <BracketBoard
+      bracket={dayState.bracket}
+      teamsById={teamsById}
+      editable={true}
+      execTeamIds={execTeamIds}
+      onSetWinner={setWinner}
+      onResetWinner={resetWinner}
+      renderExtra={(m,r,i)=>{
+        const aId = getSlotTeam(dayState.bracket, r, i, "A");
+        const bId = getSlotTeam(dayState.bracket, r, i, "B");
+        return (
+          <div>
+            {info.hasFirstMover &&
+              <FirstMoverPicker match={m} teamsById={teamsById} aId={aId} bId={bId}
+                onUpdate={(patch)=>setMeta(r,i,patch)}
+                onReset={()=>resetMeta(r,i,["firstMoverId","firstMoverLabel"])} />}
+            {info.hasSetScore &&
+              <SetScorePicker match={m} aId={aId} bId={bId}
+                onUpdate={(patch)=>setMeta(r,i,patch)}
+                onWinner={(teamId)=>setWinner(r,i,teamId)}
+                onReset={()=>resetMeta(r,i,["setScore","setA","setB"])} />}
+          </div>
+        );
+      }}
+    />
   );
 }
 
@@ -594,67 +698,24 @@ function SeedingEditor({ dayKey, bracket, teams, update }){
 function DayTab({ dayKey, state, update, teamsById }){
   const info = dayInfo(dayKey);
   const dayState = state.days[dayKey];
-  const execTeamIds = state.scoring[dayKey].execTeams;
-
-  const setWinner = (r,i,teamId)=>{
-    update(s=>{
-      const b = s.days[dayKey].bracket;
-      const m = b.rounds[r][i];
-      if(m.winnerId===teamId) return null;
-      m.winnerId = teamId;
-      clearDownstream(b, r, i);
-      return s;
-    });
-  };
-  const setMeta = (r,i,patch)=>{
-    update(s=>{
-      const m = s.days[dayKey].bracket.rounds[r][i];
-      m.meta = { ...m.meta, ...patch };
-      return s;
-    });
-  };
 
   if(info.format==="bracket"){
     return (
       <div>
         <SeedingEditor dayKey={dayKey} bracket={dayState.bracket} teams={state.teams} update={update} />
         <div className="card">
-        <div className="day-header">
-          <div className="title">{info.label} · {info.game}</div>
-          <div className="sub">{info.date} · {info.place} · {info.unit}</div>
-        </div>
-        <BracketBoard
-          bracket={dayState.bracket}
-          teamsById={teamsById}
-          editable={true}
-          execTeamIds={execTeamIds}
-          onSetWinner={(r,i,teamId)=>setWinner(r,i,teamId)}
-          renderExtra={(m,r,i)=>{
-            const aId = getSlotTeam(dayState.bracket, r, i, "A");
-            const bId = getSlotTeam(dayState.bracket, r, i, "B");
-            return (
-              <div>
-                {info.hasFirstMover &&
-                  <FirstMoverPicker match={m} teamsById={teamsById} aId={aId} bId={bId}
-                    onUpdate={(patch)=>setMeta(r,i,patch)} />}
-                {info.hasSetScore &&
-                  <div className="stopwatch-box" onClick={e=>e.stopPropagation()}>
-                    <div className="field" style={{marginBottom:0}}>
-                      <label>세트 스코어 (예: 2:1)</label>
-                      <input type="text" defaultValue={(m.meta&&m.meta.setScore)||""} placeholder="2:1"
-                        onBlur={(e)=>setMeta(r,i,{setScore:e.target.value})} />
-                    </div>
-                  </div>}
-              </div>
-            );
-          }}
-        />
+          <div className="day-header">
+            <div className="title">{info.label} · {info.game}</div>
+            <div className="sub">{info.date} · {info.place} · {info.unit}</div>
+          </div>
+          <InteractiveBracketSection dayKey={dayKey} state={state} update={update} teamsById={teamsById} />
         </div>
       </div>
     );
   }
 
   // day3 ranking editor
+  const execTeamIds = state.scoring[dayKey].execTeams;
   const entries = dayState.entries;
   const toggleMode = (mode)=> update(s=>{ s.days.day3.mode = mode; return s; });
   const setTime = (teamId, val)=> update(s=>{
@@ -950,7 +1011,7 @@ function App(){
       </div>
       <div className="app-content">
         {saveError && <div className="banner">⚠️ {saveError}</div>}
-        {mode==="display" ? <DisplayView state={state} /> : <AdminView state={state} update={update} />}
+        {mode==="display" ? <DisplayView state={state} update={update} /> : <AdminView state={state} update={update} />}
         <button className="floating-toggle" onClick={()=>setMode(m=>m==="admin"?"display":"admin")} title="관리자 모드 전환 (여기를 눌러 전환)">
           {mode==="admin" ? "📺" : "⚙️"}
         </button>

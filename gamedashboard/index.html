@@ -151,9 +151,26 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .day-header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
 .day-header .title{font-size:18px;font-weight:900;}
 .day-header .sub{color:var(--sub);font-size:13px;}
-.stopwatch-box{margin-top:8px;background:#081a34;border:1px dashed var(--line);border-radius:10px;padding:10px;}
-.stopwatch-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
-.timer-display{font-variant-numeric:tabular-nums;font-size:20px;font-weight:900;color:var(--cyan2);min-width:80px;}
+.match-reset-btn{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;
+  background:rgba(255,92,92,.18);border:1px solid var(--red);color:var(--red);font-size:11px;line-height:1;
+  display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;z-index:1;}
+.match-reset-btn:hover{background:rgba(255,92,92,.35);}
+/* compact single-row widgets (first-mover / set-score) — kept small since
+   they render inline on every real match, admin and display screen alike */
+.mini-widget{margin-top:5px;background:#081a34;border:1px dashed var(--line);border-radius:7px;padding:3px 4px;}
+.mini-widget-row{display:flex;align-items:center;gap:3px;}
+.mini-label{font-size:9px;color:var(--sub);font-weight:700;flex:none;}
+.mini-pick{flex:1;min-width:0;padding:3px 2px;font-size:10px;border-radius:5px;border:1px solid var(--line);
+  background:#0d2140;color:var(--text);font-weight:700;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mini-pick.active{background:linear-gradient(90deg,var(--orange),var(--orange2));color:#241000;border-color:transparent;}
+.mini-stepper-btn{flex:none;width:16px;height:16px;border-radius:50%;background:#0d2140;border:1px solid var(--line);
+  color:var(--text);font-size:10px;line-height:1;padding:0;cursor:pointer;}
+.mini-stepper-btn:hover{filter:brightness(1.2);}
+.mini-num{font-weight:900;font-size:12px;min-width:10px;text-align:center;color:var(--cyan2);flex:none;}
+.mini-colon{font-weight:900;color:var(--sub);font-size:10px;flex:none;}
+.mini-reset{flex:none;width:16px;height:16px;border-radius:50%;background:rgba(255,92,92,.18);
+  border:1px solid var(--red);color:var(--red);font-size:9px;line-height:1;padding:0;cursor:pointer;}
+.mini-reset:hover{background:rgba(255,92,92,.35);}
 .rank-edit-row{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;}
 .floating-toggle{position:fixed;right:16px;bottom:16px;width:46px;height:46px;border-radius:50%;
   background:rgba(15,37,71,.85);border:2px solid var(--orange);color:var(--orange2);z-index:50;font-size:20px;
@@ -1105,6 +1122,7 @@ function BracketBoard({
   teamsById,
   editable,
   onSetWinner,
+  onResetWinner,
   renderExtra,
   execTeamIds
 }) {
@@ -1205,11 +1223,21 @@ function BracketBoard({
       if (changing && !window.confirm("정말 변경하시겠습니까? 다음 라운드에 반영된 결과도 함께 초기화됩니다.")) return;
       onSetWinner(r, i, teamId);
     };
+    const canReset = editable && !isBye && m.winnerId;
+    const resetWinner = e => {
+      e.stopPropagation();
+      if (!window.confirm("승자를 초기화할까요? 다음 라운드에 반영된 결과도 함께 초기화됩니다.")) return;
+      onResetWinner(r, i);
+    };
     return /*#__PURE__*/React.createElement("div", {
       className: "match" + (m.winnerId ? " decided" : ""),
       key: m.id,
       ref: setRef(r, i)
-    }, canPick ? /*#__PURE__*/React.createElement("button", {
+    }, canReset && /*#__PURE__*/React.createElement("button", {
+      className: "match-reset-btn",
+      onClick: resetWinner,
+      title: "\uC2B9\uC790 \uCD08\uAE30\uD654"
+    }, "\u21BA"), canPick ? /*#__PURE__*/React.createElement("button", {
       className: "slot-btn",
       onClick: () => pick(aId)
     }, /*#__PURE__*/React.createElement("span", {
@@ -1241,11 +1269,7 @@ function BracketBoard({
     }, /*#__PURE__*/React.createElement(TeamChip, {
       team: bTeam,
       exec: isExec(bId)
-    })), m.meta && m.meta.firstMoverId && teamsById[m.meta.firstMoverId] && /*#__PURE__*/React.createElement("div", {
-      className: "match-meta"
-    }, m.meta.firstMoverLabel || "선공", ": ", /*#__PURE__*/React.createElement("b", null, teamsById[m.meta.firstMoverId].name)), m.meta && m.meta.setScore && /*#__PURE__*/React.createElement("div", {
-      className: "match-meta"
-    }, "\uC138\uD2B8 \uC2A4\uCF54\uC5B4: ", /*#__PURE__*/React.createElement("b", null, m.meta.setScore)), renderExtra && aTeam && bTeam && !isBye && renderExtra(m, r, i));
+    })), renderExtra && aTeam && bTeam && !isBye && renderExtra(m, r, i));
   }))))));
 }
 
@@ -1281,7 +1305,8 @@ function RankingBoard({
 
 /* ============================== display view ============================== */
 function DisplayView({
-  state
+  state,
+  update
 }) {
   const teamsById = useMemo(() => Object.fromEntries(state.teams.map(t => [t.id, t])), [state.teams]);
   const activeKey = state.display.activeDayKey;
@@ -1341,12 +1366,11 @@ function DisplayView({
     className: "top9c-score"
   }, t.total)))))), /*#__PURE__*/React.createElement("div", {
     className: "today-panel-full"
-  }, info.format === "bracket" ? /*#__PURE__*/React.createElement(BracketBoard, {
-    bracket: state.days[activeKey].bracket,
-    teamsById: teamsById,
-    editable: false,
-    onSetWinner: () => {},
-    execTeamIds: execTeamIds
+  }, info.format === "bracket" ? /*#__PURE__*/React.createElement(InteractiveBracketSection, {
+    dayKey: activeKey,
+    state: state,
+    update: update,
+    teamsById: teamsById
   }) : /*#__PURE__*/React.createElement(RankingBoard, {
     day3: state.days.day3,
     teamsById: teamsById,
@@ -1359,6 +1383,7 @@ function DisplayView({
 function FirstMoverPicker({
   match,
   onUpdate,
+  onReset,
   teamsById,
   aId,
   bId
@@ -1369,24 +1394,157 @@ function FirstMoverPicker({
     firstMoverLabel: "선공"
   });
   return /*#__PURE__*/React.createElement("div", {
-    className: "stopwatch-box",
+    className: "mini-widget",
     onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "var(--sub)",
-      fontWeight: 700,
-      marginBottom: 6
-    }
-  }, "\uC120\uACF5 \uD300 \uC120\uD0DD"), /*#__PURE__*/React.createElement("div", {
-    className: "stopwatch-row"
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "small-btn" + (current === aId ? " primary" : ""),
+    className: "mini-widget-row"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "mini-label"
+  }, "\uC120\uACF5"), /*#__PURE__*/React.createElement("button", {
+    className: "mini-pick" + (current === aId ? " active" : ""),
     onClick: () => pick(aId)
-  }, teamsById[aId] && teamsById[aId].name, " \uC120\uACF5"), /*#__PURE__*/React.createElement("button", {
-    className: "small-btn" + (current === bId ? " primary" : ""),
+  }, teamsById[aId] && teamsById[aId].name), /*#__PURE__*/React.createElement("button", {
+    className: "mini-pick" + (current === bId ? " active" : ""),
     onClick: () => pick(bId)
-  }, teamsById[bId] && teamsById[bId].name, " \uC120\uACF5")));
+  }, teamsById[bId] && teamsById[bId].name), current && /*#__PURE__*/React.createElement("button", {
+    className: "mini-reset",
+    title: "\uC120\uACF5 \uCD08\uAE30\uD654",
+    onClick: () => {
+      if (window.confirm("선공 기록을 초기화할까요?")) onReset();
+    }
+  }, "\u21BA")));
+}
+
+/* ============================== day2: set-score picker (3판 2선승) ============================== */
+/* Entering the set score decides the match automatically — first to 2 wins. */
+function SetScorePicker({
+  match,
+  onUpdate,
+  onWinner,
+  onReset,
+  aId,
+  bId
+}) {
+  const setA = match.meta && match.meta.setA || 0;
+  const setB = match.meta && match.meta.setB || 0;
+  const bump = (side, delta) => {
+    let a = setA,
+      b = setB;
+    if (side === "A") a = Math.max(0, Math.min(2, a + delta));else b = Math.max(0, Math.min(2, b + delta));
+    onUpdate({
+      setA: a,
+      setB: b,
+      setScore: `${a}:${b}`
+    });
+    if (a === 2 && b < 2) onWinner(aId);else if (b === 2 && a < 2) onWinner(bId);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "mini-widget",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "mini-widget-row"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "mini-label"
+  }, "\uC138\uD2B8"), /*#__PURE__*/React.createElement("button", {
+    className: "mini-stepper-btn",
+    onClick: () => bump("A", -1)
+  }, "\uFF0D"), /*#__PURE__*/React.createElement("span", {
+    className: "mini-num"
+  }, setA), /*#__PURE__*/React.createElement("button", {
+    className: "mini-stepper-btn",
+    onClick: () => bump("A", 1)
+  }, "\uFF0B"), /*#__PURE__*/React.createElement("span", {
+    className: "mini-colon"
+  }, ":"), /*#__PURE__*/React.createElement("button", {
+    className: "mini-stepper-btn",
+    onClick: () => bump("B", -1)
+  }, "\uFF0D"), /*#__PURE__*/React.createElement("span", {
+    className: "mini-num"
+  }, setB), /*#__PURE__*/React.createElement("button", {
+    className: "mini-stepper-btn",
+    onClick: () => bump("B", 1)
+  }, "\uFF0B"), (setA > 0 || setB > 0) && /*#__PURE__*/React.createElement("button", {
+    className: "mini-reset",
+    title: "\uC810\uC218 \uCD08\uAE30\uD654",
+    onClick: () => {
+      if (window.confirm("세트 스코어를 초기화할까요? (승자는 별도로 초기화해야 합니다)")) onReset();
+    }
+  }, "\u21BA")));
+}
+
+/* ============================== interactive bracket (shared: admin + display) ============================== */
+/* Winner picking, first-mover, set-score and their resets — used both in the
+   admin tab and directly on the display screen, since flipping into admin
+   mode for every single match update isn't practical during a live event. */
+function InteractiveBracketSection({
+  dayKey,
+  state,
+  update,
+  teamsById
+}) {
+  const info = dayInfo(dayKey);
+  const dayState = state.days[dayKey];
+  const execTeamIds = state.scoring[dayKey].execTeams;
+  const setWinner = (r, i, teamId) => update(s => {
+    const b = s.days[dayKey].bracket;
+    const m = b.rounds[r][i];
+    if (m.winnerId === teamId) return null;
+    m.winnerId = teamId;
+    clearDownstream(b, r, i);
+    return s;
+  });
+  const resetWinner = (r, i) => update(s => {
+    const b = s.days[dayKey].bracket;
+    const m = b.rounds[r][i];
+    if (!m.winnerId) return null;
+    m.winnerId = null;
+    clearDownstream(b, r, i);
+    return s;
+  });
+  const setMeta = (r, i, patch) => update(s => {
+    const m = s.days[dayKey].bracket.rounds[r][i];
+    m.meta = {
+      ...m.meta,
+      ...patch
+    };
+    return s;
+  });
+  const resetMeta = (r, i, keys) => update(s => {
+    const m = s.days[dayKey].bracket.rounds[r][i];
+    const meta = {
+      ...m.meta
+    };
+    keys.forEach(k => delete meta[k]);
+    m.meta = meta;
+    return s;
+  });
+  return /*#__PURE__*/React.createElement(BracketBoard, {
+    bracket: dayState.bracket,
+    teamsById: teamsById,
+    editable: true,
+    execTeamIds: execTeamIds,
+    onSetWinner: setWinner,
+    onResetWinner: resetWinner,
+    renderExtra: (m, r, i) => {
+      const aId = getSlotTeam(dayState.bracket, r, i, "A");
+      const bId = getSlotTeam(dayState.bracket, r, i, "B");
+      return /*#__PURE__*/React.createElement("div", null, info.hasFirstMover && /*#__PURE__*/React.createElement(FirstMoverPicker, {
+        match: m,
+        teamsById: teamsById,
+        aId: aId,
+        bId: bId,
+        onUpdate: patch => setMeta(r, i, patch),
+        onReset: () => resetMeta(r, i, ["firstMoverId", "firstMoverLabel"])
+      }), info.hasSetScore && /*#__PURE__*/React.createElement(SetScorePicker, {
+        match: m,
+        aId: aId,
+        bId: bId,
+        onUpdate: patch => setMeta(r, i, patch),
+        onWinner: teamId => setWinner(r, i, teamId),
+        onReset: () => resetMeta(r, i, ["setScore", "setA", "setB"])
+      }));
+    }
+  });
 }
 
 /* ============================== admin: bracket seeding editor ============================== */
@@ -1452,27 +1610,6 @@ function DayTab({
 }) {
   const info = dayInfo(dayKey);
   const dayState = state.days[dayKey];
-  const execTeamIds = state.scoring[dayKey].execTeams;
-  const setWinner = (r, i, teamId) => {
-    update(s => {
-      const b = s.days[dayKey].bracket;
-      const m = b.rounds[r][i];
-      if (m.winnerId === teamId) return null;
-      m.winnerId = teamId;
-      clearDownstream(b, r, i);
-      return s;
-    });
-  };
-  const setMeta = (r, i, patch) => {
-    update(s => {
-      const m = s.days[dayKey].bracket.rounds[r][i];
-      m.meta = {
-        ...m.meta,
-        ...patch
-      };
-      return s;
-    });
-  };
   if (info.format === "bracket") {
     return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(SeedingEditor, {
       dayKey: dayKey,
@@ -1487,42 +1624,16 @@ function DayTab({
       className: "title"
     }, info.label, " \xB7 ", info.game), /*#__PURE__*/React.createElement("div", {
       className: "sub"
-    }, info.date, " \xB7 ", info.place, " \xB7 ", info.unit)), /*#__PURE__*/React.createElement(BracketBoard, {
-      bracket: dayState.bracket,
-      teamsById: teamsById,
-      editable: true,
-      execTeamIds: execTeamIds,
-      onSetWinner: (r, i, teamId) => setWinner(r, i, teamId),
-      renderExtra: (m, r, i) => {
-        const aId = getSlotTeam(dayState.bracket, r, i, "A");
-        const bId = getSlotTeam(dayState.bracket, r, i, "B");
-        return /*#__PURE__*/React.createElement("div", null, info.hasFirstMover && /*#__PURE__*/React.createElement(FirstMoverPicker, {
-          match: m,
-          teamsById: teamsById,
-          aId: aId,
-          bId: bId,
-          onUpdate: patch => setMeta(r, i, patch)
-        }), info.hasSetScore && /*#__PURE__*/React.createElement("div", {
-          className: "stopwatch-box",
-          onClick: e => e.stopPropagation()
-        }, /*#__PURE__*/React.createElement("div", {
-          className: "field",
-          style: {
-            marginBottom: 0
-          }
-        }, /*#__PURE__*/React.createElement("label", null, "\uC138\uD2B8 \uC2A4\uCF54\uC5B4 (\uC608: 2:1)"), /*#__PURE__*/React.createElement("input", {
-          type: "text",
-          defaultValue: m.meta && m.meta.setScore || "",
-          placeholder: "2:1",
-          onBlur: e => setMeta(r, i, {
-            setScore: e.target.value
-          })
-        }))));
-      }
+    }, info.date, " \xB7 ", info.place, " \xB7 ", info.unit)), /*#__PURE__*/React.createElement(InteractiveBracketSection, {
+      dayKey: dayKey,
+      state: state,
+      update: update,
+      teamsById: teamsById
     })));
   }
 
   // day3 ranking editor
+  const execTeamIds = state.scoring[dayKey].execTeams;
   const entries = dayState.entries;
   const toggleMode = mode => update(s => {
     s.days.day3.mode = mode;
@@ -2026,7 +2137,8 @@ function App() {
   }, saveError && /*#__PURE__*/React.createElement("div", {
     className: "banner"
   }, "\u26A0\uFE0F ", saveError), mode === "display" ? /*#__PURE__*/React.createElement(DisplayView, {
-    state: state
+    state: state,
+    update: update
   }) : /*#__PURE__*/React.createElement(AdminView, {
     state: state,
     update: update
