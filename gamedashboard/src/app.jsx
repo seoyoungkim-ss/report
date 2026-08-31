@@ -827,11 +827,24 @@ function App(){
 
   return (
     <div className="app">
-      {saveError && <div className="banner">⚠️ {saveError}</div>}
-      {mode==="display" ? <DisplayView state={state} /> : <AdminView state={state} update={update} />}
-      <button className="floating-toggle" onClick={()=>setMode(m=>m==="admin"?"display":"admin")} title="관리자 모드 전환 (여기를 눌러 전환)">
-        {mode==="admin" ? "📺" : "⚙️"}
-      </button>
+      <div className="fest-bg" aria-hidden="true">
+        <span className="fest-sun">☀️</span>
+        <span className="fest-cloud fest-cloud-a">☁️</span>
+        <span className="fest-cloud fest-cloud-b">☁️</span>
+        <span className="fest-palm fest-palm-l">🌴</span>
+        <span className="fest-palm fest-palm-r">🌴</span>
+        <svg className="fest-wave" viewBox="0 0 1440 120" preserveAspectRatio="none">
+          <path d="M0,45 C240,95 480,5 720,45 C960,85 1200,15 1440,55 L1440,120 L0,120 Z" fill="rgba(234,247,255,0.55)"/>
+          <path d="M0,75 C240,115 480,45 720,75 C960,105 1200,55 1440,85 L1440,120 L0,120 Z" fill="rgba(234,247,255,0.9)"/>
+        </svg>
+      </div>
+      <div className="app-content">
+        {saveError && <div className="banner">⚠️ {saveError}</div>}
+        {mode==="display" ? <DisplayView state={state} /> : <AdminView state={state} update={update} />}
+        <button className="floating-toggle" onClick={()=>setMode(m=>m==="admin"?"display":"admin")} title="관리자 모드 전환 (여기를 눌러 전환)">
+          {mode==="admin" ? "📺" : "⚙️"}
+        </button>
+      </div>
     </div>
   );
 }

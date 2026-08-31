@@ -1,17 +1,31 @@
 :root{
-  --bg:#071428; --bg2:#0b1e3d; --panel:#0f2547; --panel2:#122c56;
+  --bg:#1f7fe0; --bg2:#0b1e3d; --panel:#0f2547; --panel2:#122c56;
   --line:#1c3a68; --text:#eaf4ff; --sub:#9db4d9;
   --orange:#ff7a29; --orange2:#ffb648; --cyan:#26e0d9; --cyan2:#7bf1ec;
   --gold:#ffd166; --red:#ff5c5c; --green:#3ddc84;
+  --sky1:#1f7fe0; --sky2:#2f97ee; --sky3:#6fc6f7; --wave:#eaf7ff;
 }
 *{box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);}
 .app{min-height:100vh;background:
-  radial-gradient(1200px 600px at 10% -10%, #123464 0%, transparent 60%),
-  radial-gradient(1000px 500px at 110% 10%, #1a1030 0%, transparent 55%),
-  linear-gradient(180deg,var(--bg) 0%, #050e1e 100%);
+  radial-gradient(650px 650px at 90% -8%, rgba(255,217,61,.55) 0%, rgba(255,217,61,0) 60%),
+  linear-gradient(180deg, var(--sky1) 0%, var(--sky2) 45%, var(--sky3) 100%);
   font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
   padding:0;position:relative;overflow-x:hidden;}
+.app-content{position:relative;z-index:1;}
+/* decorative summer-festival backdrop — purely visual, sits behind the cards */
+.fest-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.fest-sun{position:absolute;top:-46px;right:36px;font-size:150px;line-height:1;
+  filter:drop-shadow(0 0 46px rgba(255,217,61,.75));opacity:.95;}
+.fest-cloud{position:absolute;font-size:86px;line-height:1;opacity:.9;
+  filter:drop-shadow(0 6px 10px rgba(10,40,80,.12));}
+.fest-cloud-a{top:22px;left:5%;}
+.fest-cloud-b{top:100px;left:56%;font-size:64px;}
+.fest-palm{position:absolute;bottom:-14px;font-size:170px;line-height:1;opacity:.95;
+  filter:drop-shadow(0 10px 16px rgba(4,20,40,.28));}
+.fest-palm-l{left:-26px;transform:scaleX(-1);}
+.fest-palm-r{right:-26px;}
+.fest-wave{position:absolute;left:0;right:0;bottom:0;width:100%;height:110px;}
 button{font-family:inherit;cursor:pointer;}
 input,select{font-family:inherit;}
 ::-webkit-scrollbar{width:10px;height:10px;}
@@ -19,7 +33,7 @@ input,select{font-family:inherit;}
 
 /* ---------- top bar ---------- */
 .topbar{display:flex;align-items:center;justify-content:space-between;
-  padding:18px 32px;background:linear-gradient(90deg,#0a1c3a,#0f2a52 60%,#0a1c3a);
+  padding:18px 32px;background:linear-gradient(90deg,#0a2245,#123a68 60%,#0a2245);
   border-bottom:3px solid var(--orange);position:relative;z-index:2;}
 .brand{display:flex;align-items:center;gap:14px;}
 .brand .emoji{font-size:34px;filter:drop-shadow(0 0 10px rgba(255,122,41,.6));}
