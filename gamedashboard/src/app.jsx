@@ -372,11 +372,17 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, renderExtra, 
 
   useLayoutEffect(()=>{
     recompute();
+    // the embedded webfont can swap in after this first measurement (font-display:swap),
+    // reflowing match-card text and shifting box positions — recompute again once it's ready.
+    if(document.fonts && document.fonts.ready){
+      document.fonts.ready.then(()=>recompute());
+    }
+    const safetyTimer = setTimeout(recompute, 400);
     const onResize = ()=>recompute();
     window.addEventListener("resize", onResize);
     const ro = new ResizeObserver(()=>recompute());
     if(containerRef.current) ro.observe(containerRef.current);
-    return ()=>{ window.removeEventListener("resize", onResize); ro.disconnect(); };
+    return ()=>{ window.removeEventListener("resize", onResize); ro.disconnect(); clearTimeout(safetyTimer); };
   },[recompute]);
 
   return (
@@ -480,24 +486,28 @@ function DisplayView({ state }){
         </div>
       </div>
       <div className="display-wrap">
-        <div className="today-panel">
+        <div className="today-header-row">
           <div className="panel-title"><span className="bar"></span>오늘의 경기 현황 · {info.game}</div>
+          <div className="top9-compact">
+            <div className="top9-compact-title">종합 순위 TOP 9</div>
+            <div className="top9-compact-grid">
+              {overall.map((t,idx)=>(
+                <div className={"top9c-chip" + (idx<3?" top3":"")} key={t.id} title={t.firstPlaceCount>0?`🥇×${t.firstPlaceCount}`:undefined}>
+                  <span className="top9c-rank">{idx+1}</span>
+                  {t.image
+                    ? <img className="top9c-dot" src={t.image} style={{objectFit:"cover"}} />
+                    : <span className="top9c-dot" style={{background:t.color}}></span>}
+                  <span className="top9c-name">{t.name}</span>
+                  <span className="top9c-score">{t.total}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="today-panel-full">
           {info.format==="bracket"
             ? <BracketBoard bracket={state.days[activeKey].bracket} teamsById={teamsById} editable={false} onSetWinner={()=>{}} execTeamIds={execTeamIds} />
             : <RankingBoard day3={state.days.day3} teamsById={teamsById} execTeamIds={execTeamIds} />}
-        </div>
-        <div className="overall-panel">
-          <div className="panel-title"><span className="bar" style={{background:"var(--cyan)"}}></span>종합 순위 TOP 9</div>
-          <div className="top9">
-            {overall.map((t,idx)=>(
-              <div className={"top9-row" + (idx<3?" top3":"")} key={t.id}>
-                <div className="top9-rank">{idx+1}</div>
-                <TeamChip team={t} exec={execTeamIds.includes(t.id)} />
-                {t.firstPlaceCount>0 && <span className="gold-count" title="게임별 1등 횟수 (동점 시 우선순위)">🥇×{t.firstPlaceCount}</span>}
-                <div className="top9-score">{t.total}<span style={{fontSize:11,color:"var(--sub)",fontWeight:600}}> pt</span></div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>
@@ -636,11 +646,13 @@ function DayTab({ dayKey, state, update, teamsById }){
     e.timeSec = parseTimeInput(val);
     return s;
   });
-  const move = (idx, dir)=> update(s=>{
+  const setRank = (teamId, newRank)=> update(s=>{
     const arr = s.days.day3.entries;
-    const j = idx+dir;
-    if(j<0||j>=arr.length) return null;
-    const tmp = arr[idx]; arr[idx]=arr[j]; arr[j]=tmp;
+    const idx = arr.findIndex(x=>x.teamId===teamId);
+    const newIdx = Math.max(0, Math.min(arr.length-1, newRank-1));
+    if(idx<0 || idx===newIdx) return null;
+    const [item] = arr.splice(idx,1);
+    arr.splice(newIdx,0,item);
     return s;
   });
   const ranked = getRankedEntries(dayState);
@@ -667,10 +679,10 @@ function DayTab({ dayKey, state, update, teamsById }){
                 ? <input type="text" style={{marginLeft:"auto",width:100}} placeholder="mm:ss"
                     defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}
                     onBlur={(ev)=>setTime(e.teamId, ev.target.value)} />
-                : <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-                    <button className="small-btn" onClick={()=>move(idx,-1)}>↑</button>
-                    <button className="small-btn" onClick={()=>move(idx,1)}>↓</button>
-                  </div>}
+                : <select style={{marginLeft:"auto",width:80}} value={rankOf[e.teamId]||idx+1}
+                    onChange={(ev)=>setRank(e.teamId, parseInt(ev.target.value,10))}>
+                    {entries.map((_,i)=><option key={i} value={i+1}>{i+1}위</option>)}
+                  </select>}
             </div>
           );
         })}
@@ -871,7 +883,11 @@ function App(){
   });
 
   const heroGames = (mode==="display" && state) ? (DAY_ILLUSTRATIONS[state.display.activeDayKey] || []) : [];
-  const heroSize = heroGames.length>1 ? 190 : 280;
+  // bracket days now use the full canvas bottom-to-top, so the illustration
+  // moves up beside the final-round box (a narrower gap) instead of sitting
+  // at the bottom, and needs to be a bit smaller to fit there
+  const heroPos = (state && dayInfo(state.display.activeDayKey).format==="ranking") ? "bottom" : "top";
+  const heroSize = heroGames.length>1 ? 190 : (heroPos==="top" ? 190 : 280);
 
   return (
     <div className="app">
@@ -882,7 +898,7 @@ function App(){
         <span className="fest-palm fest-palm-l">🌴</span>
         <span className="fest-palm fest-palm-r">🌴</span>
 
-        {heroGames.length>0 && <div className="fest-hero">
+        {heroGames.length>0 && <div className={"fest-hero fest-hero-" + heroPos}>
           {heroGames.map((g,i)=>{
             const Illust = ILLUSTRATIONS[g.id];
             const layout = heroGames.length>1

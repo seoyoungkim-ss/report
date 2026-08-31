@@ -35,8 +35,13 @@ body{background:var(--bg);color:var(--text);}
 .fest-palm-r{right:-26px;}
 .fest-wave{position:absolute;left:0;right:0;bottom:0;width:100%;height:110px;}
 /* today's game illustration(s) — flat, no backdrop/caption, scattered for a dynamic collage feel */
-.fest-hero{position:absolute;bottom:140px;right:11%;max-width:40%;
-  display:flex;align-items:center;}
+.fest-hero{position:absolute;max-width:40%;display:flex;align-items:center;}
+/* ranking day (Day3): the list is short, so the bottom stays clear */
+.fest-hero-bottom{bottom:140px;right:11%;}
+/* bracket days: round 1 now spans full width bottom-to-top, so there's no
+   clear spot down there any more — tuck it up beside the (single, narrow)
+   final-round box instead, below the compact TOP9 box */
+.fest-hero-top{top:250px;right:5%;}
 .fest-hero-item{display:flex;}
 .fest-hero-item svg,.fest-hero-item img{filter:drop-shadow(0 14px 20px rgba(4,20,40,.34));}
 button{font-family:inherit;cursor:pointer;}
@@ -60,10 +65,12 @@ input,select{font-family:inherit;}
 .daybadge .meta{color:var(--sub);font-size:13px;}
 
 /* ---------- display layout ---------- */
-.display-wrap{display:flex;gap:22px;padding:26px 32px;align-items:flex-start;}
-.today-panel{flex:1 1 66%;min-width:0;}
-.overall-panel{flex:1 1 34%;min-width:340px;}
-.panel-title{display:flex;align-items:center;gap:10px;margin:0 0 14px;font-size:20px;font-weight:900;color:var(--gold);}
+/* full-width bracket/ranking on top, a compact TOP9 tucked top-right so
+   nothing needs scrolling to be seen at a glance */
+.display-wrap{padding:22px 32px;}
+.today-header-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:10px;flex-wrap:wrap;}
+.today-panel-full{width:100%;}
+.panel-title{display:flex;align-items:center;gap:10px;margin:0;font-size:20px;font-weight:900;color:var(--gold);flex:none;}
 .panel-title .bar{width:6px;height:22px;background:var(--gold);border-radius:3px;display:inline-block;}
 
 /* ---------- bracket ---------- */
@@ -71,9 +78,9 @@ input,select{font-family:inherit;}
 /* rounds stack bottom-to-top: round 1 at the bottom, the final at the top */
 .bracket{position:relative;display:flex;flex-direction:column-reverse;gap:40px;padding:10px;}
 .round-block{display:flex;flex-direction:column;gap:8px;}
-.round-row{display:flex;flex-direction:row;align-items:center;justify-content:space-around;gap:16px;}
+.round-row{display:flex;flex-direction:row;align-items:center;justify-content:space-around;gap:12px;}
 .round-label{text-align:center;color:var(--sub);font-size:12px;font-weight:800;letter-spacing:2px;margin-bottom:2px;text-transform:uppercase;}
-.match{width:200px;flex:none;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
+.match{width:152px;flex:none;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
   border-radius:12px;padding:8px;margin:0;position:relative;transition:all .25s;}
 .match.decided{border-color:var(--cyan);box-shadow:0 0 18px rgba(38,224,217,.35);}
 .slot{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;font-weight:700;font-size:14px;}
@@ -108,13 +115,17 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .team-name{font-weight:800;}
 .exec-badge{font-size:10px;font-weight:900;color:#241a00;background:var(--gold);border-radius:6px;padding:2px 6px;flex:none;}
 
-/* ---------- overall top9 ---------- */
-.top9{display:flex;flex-direction:column;gap:8px;}
-.top9-row{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 14px;}
-.top9-row.top3{background:linear-gradient(90deg,rgba(255,122,41,.16),var(--panel));border-color:var(--orange);}
-.top9-rank{width:30px;text-align:center;font-weight:900;font-size:18px;color:var(--sub);}
-.top9-row.top3 .top9-rank{color:var(--orange2);}
-.top9-score{margin-left:auto;font-weight:900;font-size:18px;color:var(--cyan2);}
+/* ---------- overall top9 (compact, top-right, all 9 visible at once) ---------- */
+.top9-compact{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;min-width:400px;flex:none;}
+.top9-compact-title{font-size:12px;font-weight:900;color:var(--gold);letter-spacing:.5px;margin-bottom:8px;}
+.top9-compact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.top9c-chip{display:flex;align-items:center;gap:5px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 7px;min-width:0;}
+.top9c-chip.top3{background:rgba(255,122,41,.16);border-color:var(--orange);}
+.top9c-rank{font-weight:900;color:var(--sub);font-size:11px;width:13px;flex:none;}
+.top9c-chip.top3 .top9c-rank{color:var(--orange2);}
+.top9c-dot{width:14px;height:14px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.25);}
+.top9c-name{font-weight:800;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.top9c-score{margin-left:auto;font-weight:900;font-size:12px;color:var(--cyan2);flex:none;}
 .gold-count{font-size:12px;color:var(--gold);font-weight:800;flex:none;}
 
 /* ---------- admin ---------- */
@@ -155,7 +166,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .table th{color:var(--sub);font-weight:700;}
 .exec-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);}
 .regulation h4{color:var(--orange2);margin:18px 0 8px;}
-@media (max-width:1000px){.display-wrap{flex-direction:column;}.overall-panel{min-width:0;}}
+@media (max-width:900px){.top9-compact{min-width:0;width:100%;}.top9-compact-grid{grid-template-columns:repeat(2,1fr);}}
 </style>
 
 <div id="root"></div>
@@ -1125,6 +1136,12 @@ function BracketBoard({
   }, [bracket]);
   useLayoutEffect(() => {
     recompute();
+    // the embedded webfont can swap in after this first measurement (font-display:swap),
+    // reflowing match-card text and shifting box positions — recompute again once it's ready.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => recompute());
+    }
+    const safetyTimer = setTimeout(recompute, 400);
     const onResize = () => recompute();
     window.addEventListener("resize", onResize);
     const ro = new ResizeObserver(() => recompute());
@@ -1132,6 +1149,7 @@ function BracketBoard({
     return () => {
       window.removeEventListener("resize", onResize);
       ro.disconnect();
+      clearTimeout(safetyTimer);
     };
   }, [recompute]);
   return /*#__PURE__*/React.createElement("div", {
@@ -1270,12 +1288,41 @@ function DisplayView({
   }, info.date, " \xB7 ", info.place, " \xB7 ", info.unit))), /*#__PURE__*/React.createElement("div", {
     className: "display-wrap"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "today-panel"
+    className: "today-header-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "panel-title"
   }, /*#__PURE__*/React.createElement("span", {
     className: "bar"
-  }), "\uC624\uB298\uC758 \uACBD\uAE30 \uD604\uD669 \xB7 ", info.game), info.format === "bracket" ? /*#__PURE__*/React.createElement(BracketBoard, {
+  }), "\uC624\uB298\uC758 \uACBD\uAE30 \uD604\uD669 \xB7 ", info.game), /*#__PURE__*/React.createElement("div", {
+    className: "top9-compact"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "top9-compact-title"
+  }, "\uC885\uD569 \uC21C\uC704 TOP 9"), /*#__PURE__*/React.createElement("div", {
+    className: "top9-compact-grid"
+  }, overall.map((t, idx) => /*#__PURE__*/React.createElement("div", {
+    className: "top9c-chip" + (idx < 3 ? " top3" : ""),
+    key: t.id,
+    title: t.firstPlaceCount > 0 ? `🥇×${t.firstPlaceCount}` : undefined
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "top9c-rank"
+  }, idx + 1), t.image ? /*#__PURE__*/React.createElement("img", {
+    className: "top9c-dot",
+    src: t.image,
+    style: {
+      objectFit: "cover"
+    }
+  }) : /*#__PURE__*/React.createElement("span", {
+    className: "top9c-dot",
+    style: {
+      background: t.color
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "top9c-name"
+  }, t.name), /*#__PURE__*/React.createElement("span", {
+    className: "top9c-score"
+  }, t.total)))))), /*#__PURE__*/React.createElement("div", {
+    className: "today-panel-full"
+  }, info.format === "bracket" ? /*#__PURE__*/React.createElement(BracketBoard, {
     bracket: state.days[activeKey].bracket,
     teamsById: teamsById,
     editable: false,
@@ -1285,37 +1332,7 @@ function DisplayView({
     day3: state.days.day3,
     teamsById: teamsById,
     execTeamIds: execTeamIds
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "overall-panel"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "panel-title"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "bar",
-    style: {
-      background: "var(--cyan)"
-    }
-  }), "\uC885\uD569 \uC21C\uC704 TOP 9"), /*#__PURE__*/React.createElement("div", {
-    className: "top9"
-  }, overall.map((t, idx) => /*#__PURE__*/React.createElement("div", {
-    className: "top9-row" + (idx < 3 ? " top3" : ""),
-    key: t.id
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "top9-rank"
-  }, idx + 1), /*#__PURE__*/React.createElement(TeamChip, {
-    team: t,
-    exec: execTeamIds.includes(t.id)
-  }), t.firstPlaceCount > 0 && /*#__PURE__*/React.createElement("span", {
-    className: "gold-count",
-    title: "\uAC8C\uC784\uBCC4 1\uB4F1 \uD69F\uC218 (\uB3D9\uC810 \uC2DC \uC6B0\uC120\uC21C\uC704)"
-  }, "\uD83E\uDD47\xD7", t.firstPlaceCount), /*#__PURE__*/React.createElement("div", {
-    className: "top9-score"
-  }, t.total, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: "var(--sub)",
-      fontWeight: 600
-    }
-  }, " pt"))))))));
+  }))));
 }
 
 /* ============================== admin: day1 first-mover picker ============================== */
@@ -1497,13 +1514,13 @@ function DayTab({
     e.timeSec = parseTimeInput(val);
     return s;
   });
-  const move = (idx, dir) => update(s => {
+  const setRank = (teamId, newRank) => update(s => {
     const arr = s.days.day3.entries;
-    const j = idx + dir;
-    if (j < 0 || j >= arr.length) return null;
-    const tmp = arr[idx];
-    arr[idx] = arr[j];
-    arr[j] = tmp;
+    const idx = arr.findIndex(x => x.teamId === teamId);
+    const newIdx = Math.max(0, Math.min(arr.length - 1, newRank - 1));
+    if (idx < 0 || idx === newIdx) return null;
+    const [item] = arr.splice(idx, 1);
+    arr.splice(newIdx, 0, item);
     return s;
   });
   const ranked = getRankedEntries(dayState);
@@ -1558,19 +1575,17 @@ function DayTab({
       placeholder: "mm:ss",
       defaultValue: e.timeSec != null ? fmtTime(e.timeSec) : "",
       onBlur: ev => setTime(e.teamId, ev.target.value)
-    }) : /*#__PURE__*/React.createElement("div", {
+    }) : /*#__PURE__*/React.createElement("select", {
       style: {
         marginLeft: "auto",
-        display: "flex",
-        gap: 6
-      }
-    }, /*#__PURE__*/React.createElement("button", {
-      className: "small-btn",
-      onClick: () => move(idx, -1)
-    }, "\u2191"), /*#__PURE__*/React.createElement("button", {
-      className: "small-btn",
-      onClick: () => move(idx, 1)
-    }, "\u2193")));
+        width: 80
+      },
+      value: rankOf[e.teamId] || idx + 1,
+      onChange: ev => setRank(e.teamId, parseInt(ev.target.value, 10))
+    }, entries.map((_, i) => /*#__PURE__*/React.createElement("option", {
+      key: i,
+      value: i + 1
+    }, i + 1, "\uC704"))));
   })));
 }
 
@@ -1902,7 +1917,11 @@ function App() {
     }
   });
   const heroGames = mode === "display" && state ? DAY_ILLUSTRATIONS[state.display.activeDayKey] || [] : [];
-  const heroSize = heroGames.length > 1 ? 190 : 280;
+  // bracket days now use the full canvas bottom-to-top, so the illustration
+  // moves up beside the final-round box (a narrower gap) instead of sitting
+  // at the bottom, and needs to be a bit smaller to fit there
+  const heroPos = state && dayInfo(state.display.activeDayKey).format === "ranking" ? "bottom" : "top";
+  const heroSize = heroGames.length > 1 ? 190 : heroPos === "top" ? 190 : 280;
   return /*#__PURE__*/React.createElement("div", {
     className: "app"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1919,7 +1938,7 @@ function App() {
   }, "\uD83C\uDF34"), /*#__PURE__*/React.createElement("span", {
     className: "fest-palm fest-palm-r"
   }, "\uD83C\uDF34"), heroGames.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "fest-hero"
+    className: "fest-hero fest-hero-" + heroPos
   }, heroGames.map((g, i) => {
     const Illust = ILLUSTRATIONS[g.id];
     const layout = heroGames.length > 1 ? [{
