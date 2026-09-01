@@ -989,10 +989,24 @@ function compressImage(file, maxDim, quality) {
 }
 
 /* ============================== local persistence ============================== */
+/* A saved bracket from an older build of this app can use a shape this
+   code no longer understands (this app has changed how it represents a
+   bracket more than once) — loading it as-is would crash before anything
+   ever renders, leaving a blank page with no way to reach the reset
+   button. So validate the shape first and silently fall back to a fresh
+   default state instead of trusting whatever's in localStorage. */
+function isValidBracket(bracket) {
+  return !!(bracket && bracket.nodes && bracket.rootId && bracket.nodes[bracket.rootId]);
+}
 function loadInitialState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const days = parsed && parsed.days;
+      const bracketDaysOk = days && DAYS.every(d => d.format !== "bracket" || isValidBracket(days[d.key] && days[d.key].bracket));
+      if (bracketDaysOk) return parsed;
+    }
   } catch (e) {/* corrupt or unavailable — fall back to defaults */}
   return createDefaultState();
 }
