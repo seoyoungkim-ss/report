@@ -73,15 +73,22 @@ input,select{font-family:inherit;}
 .panel-title{display:flex;align-items:center;gap:12px;margin:0;font-size:30px;font-weight:900;color:var(--gold);flex:none;}
 .panel-title .bar{width:8px;height:30px;background:var(--gold);border-radius:3px;display:inline-block;}
 .exec-legend{color:var(--sub);font-size:14px;font-weight:700;margin-left:4px;white-space:nowrap;}
-.exec-legend b{color:var(--gold);}
+.exec-legend b{color:#000;font-weight:900;}
 
 /* ---------- bracket ---------- */
 .bracket-scroll{overflow-x:auto;overflow-y:auto;padding-bottom:8px;}
 /* rounds stack bottom-to-top: round 1 at the bottom, the final at the top */
 .bracket{position:relative;display:flex;flex-direction:column-reverse;gap:40px;padding:10px;}
-.round-block{display:flex;flex-direction:column;gap:8px;}
+.round-block{display:flex;flex-direction:column;gap:8px;border-radius:16px;transition:all .25s;}
 .round-row{display:flex;flex-direction:row;align-items:center;justify-content:space-around;gap:12px;}
-.round-label{text-align:center;color:var(--sub);font-size:18px;font-weight:800;letter-spacing:2px;margin-bottom:4px;text-transform:uppercase;}
+.round-label{text-align:center;color:var(--sub);font-size:18px;font-weight:800;letter-spacing:2px;margin-bottom:4px;text-transform:uppercase;transition:all .25s;}
+/* the round currently being played — called out so it's obvious at a glance
+   which matches are live right now, without resizing the whole bracket
+   (resizing risked reintroducing the scroll issue the full-width layout fixed) */
+.round-block.round-current{background:rgba(255,209,102,.12);box-shadow:0 0 0 2px rgba(255,209,102,.45),0 0 26px rgba(255,209,102,.3);padding:10px 6px;}
+.round-block.round-current .round-label{color:var(--gold);font-size:21px;text-shadow:0 0 14px rgba(255,209,102,.65);}
+.round-block.round-current .round-label::before{content:"▶ ";}
+.round-block.round-current .match{border-color:var(--gold);box-shadow:0 0 16px rgba(255,209,102,.3);}
 .match{width:152px;flex:none;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
   border-radius:12px;padding:8px;margin:0;position:relative;transition:all .25s;}
 .match.decided{border-color:var(--cyan);box-shadow:0 0 18px rgba(38,224,217,.35);}
@@ -109,6 +116,9 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .rank-num{font-size:22px;font-weight:900;width:38px;text-align:center;color:var(--sub);}
 .rank-row.r1 .rank-num{color:var(--gold);font-size:28px;}
 .rank-time{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--sub);font-weight:700;}
+.rank-time-input{margin-left:auto;width:110px;text-align:right;font-variant-numeric:tabular-nums;
+  background:#081a34;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700;}
+.rank-time-input:focus{outline:none;border-color:var(--gold);}
 
 /* ---------- team chip ---------- */
 .team-chip{display:flex;align-items:center;gap:10px;}
@@ -1205,6 +1215,24 @@ function BracketBoard({
     matchRefs.current[`${r}-${i}`] = el;
   };
   const isExec = id => !!(id && execTeamIds && execTeamIds.includes(id));
+
+  // the round currently being played: the earliest round with a real match
+  // (both teams known, not a bye) that hasn't been decided yet.
+  let currentRound = -1;
+  for (let r = 0; r < bracket.rounds.length; r++) {
+    const round = bracket.rounds[r];
+    const pending = round.some((m, i) => {
+      if (m.winnerId) return false;
+      if (m.meta && m.meta.auto) return false;
+      const aId = getSlotTeam(bracket, r, i, "A");
+      const bId = getSlotTeam(bracket, r, i, "B");
+      return aId && bId;
+    });
+    if (pending) {
+      currentRound = r;
+      break;
+    }
+  }
   const recompute = useCallback(() => {
     const cont = containerRef.current;
     if (!cont) return;
@@ -1275,7 +1303,7 @@ function BracketBoard({
       className: l.decided ? "decided" : ""
     });
   })), bracket.rounds.map((round, r) => /*#__PURE__*/React.createElement("div", {
-    className: "round-block",
+    className: "round-block" + (r === currentRound ? " round-current" : ""),
     key: r
   }, /*#__PURE__*/React.createElement("div", {
     className: "round-label"
@@ -1349,13 +1377,18 @@ function BracketBoard({
 function RankingBoard({
   day3,
   teamsById,
-  execTeamIds
+  execTeamIds,
+  editable,
+  onSetTime
 }) {
   const ranked = getRankedEntries(day3).slice().sort((a, b) => {
     if (a.rank == null) return 1;
     if (b.rank == null) return -1;
     return a.rank - b.rank;
   });
+  // time input only makes sense in auto (완료 시간 기준) mode — manual mode's
+  // order is fixed by drag/dropdown rank, not by a recorded time.
+  const showTimeInput = editable && day3.mode !== "manual";
   return /*#__PURE__*/React.createElement("div", {
     className: "ranking-list"
   }, ranked.map((e, idx) => {
@@ -1369,7 +1402,14 @@ function RankingBoard({
     }, e.rank || "-"), /*#__PURE__*/React.createElement(TeamChip, {
       team: t,
       exec: execTeamIds && execTeamIds.includes(e.teamId)
-    }), /*#__PURE__*/React.createElement("div", {
+    }), showTimeInput ? /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      className: "rank-time-input",
+      placeholder: "mm:ss",
+      defaultValue: e.timeSec != null ? fmtTime(e.timeSec) : "",
+      onClick: ev => ev.stopPropagation(),
+      onBlur: ev => onSetTime(e.teamId, ev.target.value)
+    }) : /*#__PURE__*/React.createElement("div", {
       className: "rank-time"
     }, e.timeSec != null ? fmtTime(e.timeSec) : "미기록"));
   }));
@@ -1385,6 +1425,11 @@ function DisplayView({
   const info = dayInfo(activeKey);
   const execTeamIds = state.scoring[activeKey].execTeams;
   const overall = useMemo(() => computeOverall(state), [state]);
+  const setDay3Time = (teamId, val) => update(s => {
+    const e = s.days.day3.entries.find(x => x.teamId === teamId);
+    e.timeSec = parseTimeInput(val);
+    return s;
+  });
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1446,7 +1491,9 @@ function DisplayView({
   }) : /*#__PURE__*/React.createElement(RankingBoard, {
     day3: state.days.day3,
     teamsById: teamsById,
-    execTeamIds: execTeamIds
+    execTeamIds: execTeamIds,
+    editable: true,
+    onSetTime: setDay3Time
   }))));
 }
 

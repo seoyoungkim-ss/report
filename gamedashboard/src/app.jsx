@@ -405,6 +405,21 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
   const setRef = (r,i) => (el)=>{ matchRefs.current[`${r}-${i}`] = el; };
   const isExec = (id)=> !!(id && execTeamIds && execTeamIds.includes(id));
 
+  // the round currently being played: the earliest round with a real match
+  // (both teams known, not a bye) that hasn't been decided yet.
+  let currentRound = -1;
+  for(let r=0;r<bracket.rounds.length;r++){
+    const round = bracket.rounds[r];
+    const pending = round.some((m,i)=>{
+      if(m.winnerId) return false;
+      if(m.meta && m.meta.auto) return false;
+      const aId = getSlotTeam(bracket, r, i, "A");
+      const bId = getSlotTeam(bracket, r, i, "B");
+      return aId && bId;
+    });
+    if(pending){ currentRound = r; break; }
+  }
+
   const recompute = useCallback(()=>{
     const cont = containerRef.current;
     if(!cont) return;
@@ -465,7 +480,7 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
           })}
         </svg>
         {bracket.rounds.map((round, r)=>(
-          <div className="round-block" key={r}>
+          <div className={"round-block" + (r===currentRound?" round-current":"")} key={r}>
             <div className="round-label">{r===bracket.rounds.length-1 ? "결승" : `${r+1}라운드`}</div>
             <div className="round-row">
               {round.map((m, i)=>{
@@ -519,10 +534,13 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
 }
 
 /* ============================== ranking board ============================== */
-function RankingBoard({ day3, teamsById, execTeamIds }){
+function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime }){
   const ranked = getRankedEntries(day3).slice().sort((a,b)=>{
     if(a.rank==null) return 1; if(b.rank==null) return -1; return a.rank-b.rank;
   });
+  // time input only makes sense in auto (완료 시간 기준) mode — manual mode's
+  // order is fixed by drag/dropdown rank, not by a recorded time.
+  const showTimeInput = editable && day3.mode!=="manual";
   return (
     <div className="ranking-list">
       {ranked.map((e,idx)=>{
@@ -532,7 +550,14 @@ function RankingBoard({ day3, teamsById, execTeamIds }){
           <div className={"rank-row " + rc} key={e.teamId}>
             <div className="rank-num">{e.rank || "-"}</div>
             <TeamChip team={t} exec={execTeamIds && execTeamIds.includes(e.teamId)} />
-            <div className="rank-time">{e.timeSec!=null ? fmtTime(e.timeSec) : "미기록"}</div>
+            {showTimeInput ? (
+              <input type="text" className="rank-time-input" placeholder="mm:ss"
+                defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}
+                onClick={(ev)=>ev.stopPropagation()}
+                onBlur={(ev)=>onSetTime(e.teamId, ev.target.value)} />
+            ) : (
+              <div className="rank-time">{e.timeSec!=null ? fmtTime(e.timeSec) : "미기록"}</div>
+            )}
           </div>
         );
       })}
@@ -547,6 +572,11 @@ function DisplayView({ state, update }){
   const info = dayInfo(activeKey);
   const execTeamIds = state.scoring[activeKey].execTeams;
   const overall = useMemo(()=>computeOverall(state),[state]);
+  const setDay3Time = (teamId, val)=> update(s=>{
+    const e = s.days.day3.entries.find(x=>x.teamId===teamId);
+    e.timeSec = parseTimeInput(val);
+    return s;
+  });
 
   return (
     <div>
@@ -583,7 +613,7 @@ function DisplayView({ state, update }){
         <div className="today-panel-full">
           {info.format==="bracket"
             ? <InteractiveBracketSection dayKey={activeKey} state={state} update={update} teamsById={teamsById} />
-            : <RankingBoard day3={state.days.day3} teamsById={teamsById} execTeamIds={execTeamIds} />}
+            : <RankingBoard day3={state.days.day3} teamsById={teamsById} execTeamIds={execTeamIds} editable={true} onSetTime={setDay3Time} />}
         </div>
       </div>
     </div>
