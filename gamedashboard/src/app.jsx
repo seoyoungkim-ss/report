@@ -519,7 +519,11 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
                         <span className={rowClass(bId)} style={{width:"100%"}}><TeamChip team={bTeam} exec={isExec(bId)} /></span>
                       </button>
                     ) : (
-                      <div className={rowClass(bId) + (!bTeam?" tbd":"")}><TeamChip team={bTeam} exec={isExec(bId)} /></div>
+                      // a bye's second slot never gets an opponent — "TBD" would
+                      // wrongly imply one is still coming, so hide it instead
+                      // (kept in the DOM, same height, so match cards in a round
+                      // still line up evenly for the connector lines).
+                      <div className={rowClass(bId) + (!bTeam?" tbd":"") + (isBye?" slot-hidden":"")}><TeamChip team={bTeam} exec={isExec(bId)} /></div>
                     )}
                     {renderExtra && aTeam && bTeam && !isBye && renderExtra(m, r, i)}
                   </div>

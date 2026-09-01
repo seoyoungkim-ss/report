@@ -94,6 +94,7 @@ input,select{font-family:inherit;}
 .match.decided{border-color:var(--cyan);box-shadow:0 0 18px rgba(38,224,217,.35);}
 .slot{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;font-weight:700;font-size:14px;}
 .slot.tbd{color:var(--sub);font-style:italic;font-weight:500;}
+.slot.slot-hidden{visibility:hidden;}
 .slot .dot{width:10px;height:10px;border-radius:50%;flex:none;}
 .slot.winner{background:rgba(255,209,102,.14);color:var(--gold);}
 .slot.winner .name{position:relative;}
@@ -1364,8 +1365,14 @@ function BracketBoard({
     }, /*#__PURE__*/React.createElement(TeamChip, {
       team: bTeam,
       exec: isExec(bId)
-    }))) : /*#__PURE__*/React.createElement("div", {
-      className: rowClass(bId) + (!bTeam ? " tbd" : "")
+    }))) :
+    /*#__PURE__*/
+    // a bye's second slot never gets an opponent — "TBD" would
+    // wrongly imply one is still coming, so hide it instead
+    // (kept in the DOM, same height, so match cards in a round
+    // still line up evenly for the connector lines).
+    React.createElement("div", {
+      className: rowClass(bId) + (!bTeam ? " tbd" : "") + (isBye ? " slot-hidden" : "")
     }, /*#__PURE__*/React.createElement(TeamChip, {
       team: bTeam,
       exec: isExec(bId)
