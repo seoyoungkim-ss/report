@@ -1179,4 +1179,43 @@ function App(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+/* ============================== crash guard ============================== */
+/* If anything throws during render — a bad save, a future data-shape
+   change, a bug — this catches it and shows a recoverable screen with a
+   reset button and the actual error text, instead of a blank page with
+   nothing to click (which is what a render crash looks like otherwise:
+   the .app background never mounts, so only the plain body color shows). */
+class ErrorBoundary extends React.Component {
+  constructor(props){ super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error){ return { error }; }
+  componentDidCatch(error, info){ try{ console.error("render crashed:", error, info); }catch(e){} }
+  reset = () => {
+    if(!window.confirm("이 브라우저에 저장된 모든 데이터를 지우고 초기 상태로 되돌립니다. 계속할까요?")) return;
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    window.location.reload();
+  };
+  render(){
+    if(!this.state.error) return this.props.children;
+    return (
+      <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",
+        justifyContent:"center",gap:16,padding:24,textAlign:"center",background:"#0b1e3d",color:"#eaf4ff",
+        fontFamily:"'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif"}}>
+        <div style={{fontSize:40}}>⚠️</div>
+        <h2 style={{margin:0}}>문제가 발생했습니다</h2>
+        <p style={{color:"#9db4d9",maxWidth:480,lineHeight:1.6}}>
+          저장된 데이터에 문제가 있어 화면을 그릴 수 없습니다.<br/>
+          아래 버튼으로 데이터를 초기화하면 정상적으로 다시 시작할 수 있습니다.
+        </p>
+        <button onClick={this.reset} style={{border:"1px solid #ff5c5c",color:"#ff5c5c",background:"transparent",
+          borderRadius:8,padding:"10px 18px",fontWeight:700,cursor:"pointer",fontSize:14}}>
+          ⚠️ 전체 초기화하고 다시 시작
+        </button>
+        <pre style={{color:"#5a6f8f",fontSize:11,maxWidth:640,overflow:"auto",whiteSpace:"pre-wrap",textAlign:"left"}}>
+          {String((this.state.error && this.state.error.stack) || this.state.error)}
+        </pre>
+      </div>
+    );
+  }
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App /></ErrorBoundary>);
