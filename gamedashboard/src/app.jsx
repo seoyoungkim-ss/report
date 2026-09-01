@@ -405,19 +405,48 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
   const setRef = (r,i) => (el)=>{ matchRefs.current[`${r}-${i}`] = el; };
   const isExec = (id)=> !!(id && execTeamIds && execTeamIds.includes(id));
 
-  // the round currently being played: the earliest round with a real match
-  // (both teams known, not a bye) that hasn't been decided yet.
-  let currentRound = -1;
-  for(let r=0;r<bracket.rounds.length;r++){
-    const round = bracket.rounds[r];
-    const pending = round.some((m,i)=>{
+  // Group matches by "stage" rather than raw tree depth. A bye costs no
+  // waiting (that team is available immediately), so two byes meeting for
+  // the first time — even though that's technically one tree-level deeper
+  // than the bracket's one true round-1 match — belongs in the same
+  // "1라운드" row as any match that's a real first-round pairing. This is
+  // what actually matters on event day: every match with no result it's
+  // still waiting on is playable right now, and should say so.
+  const stageOf = {};
+  const stageOfMatch = (r,i)=>{
+    const key = `${r}-${i}`;
+    if(stageOf[key]!=null) return stageOf[key];
+    const m = bracket.rounds[r][i];
+    const srcStage = (src)=>{
+      if(!src) return 0;
+      const sm = bracket.rounds[src.round][src.match];
+      if(sm.meta && sm.meta.auto) return 0; // a bye is instant, no wait
+      return stageOfMatch(src.round, src.match);
+    };
+    const s = Math.max(srcStage(m.teamASource), srcStage(m.teamBSource)) + 1;
+    stageOf[key] = s;
+    return s;
+  };
+  const stageGroups = {};
+  bracket.rounds.forEach((round,r)=>round.forEach((m,i)=>{
+    if(m.meta && m.meta.auto) return; // byes render nowhere — folded into whichever real match they feed
+    const s = stageOfMatch(r,i);
+    (stageGroups[s] = stageGroups[s] || []).push({ r, i, m });
+  }));
+  const stageKeys = Object.keys(stageGroups).map(Number).sort((a,b)=>a-b);
+  const maxStage = stageKeys[stageKeys.length-1];
+
+  // the stage currently being played: the earliest stage with a real match
+  // (both teams known) that hasn't been decided yet.
+  let currentStage = -1;
+  for(const s of stageKeys){
+    const pending = stageGroups[s].some(({r,i,m})=>{
       if(m.winnerId) return false;
-      if(m.meta && m.meta.auto) return false;
       const aId = getSlotTeam(bracket, r, i, "A");
       const bId = getSlotTeam(bracket, r, i, "B");
       return aId && bId;
     });
-    if(pending){ currentRound = r; break; }
+    if(pending){ currentStage = s; break; }
   }
 
   const recompute = useCallback(()=>{
@@ -429,6 +458,7 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
       if(r === bracket.rounds.length-1) return;
       const nextRound = bracket.rounds[r+1];
       round.forEach((m, i)=>{
+        if(m.meta && m.meta.auto) return; // a bye has no box on screen to draw a line from
         const targetIdx = nextRound.findIndex(nm =>
           (nm.teamASource && nm.teamASource.round===r && nm.teamASource.match===i) ||
           (nm.teamBSource && nm.teamBSource.round===r && nm.teamBSource.match===i));
@@ -437,8 +467,9 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
         const tgtEl = matchRefs.current[`${r+1}-${targetIdx}`];
         if(!srcEl || !tgtEl) return;
         const sr = srcEl.getBoundingClientRect(), tr = tgtEl.getBoundingClientRect();
-        // source round sits below target round: line exits the top of the
-        // source box and enters the bottom of the target box.
+        // source sits below target (or level with it, if they share a
+        // visual row's stage): line exits the top of the source box and
+        // enters the bottom of the target box.
         newLines.push({
           x1: sr.left + sr.width/2 - cRect.left, y1: sr.top - cRect.top,
           x2: tr.left + tr.width/2 - cRect.left, y2: tr.bottom - cRect.top,
@@ -479,11 +510,11 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
             return <path key={idx} d={d} className={l.decided?"decided":""} />;
           })}
         </svg>
-        {bracket.rounds.map((round, r)=>(
-          <div className={"round-block" + (r===currentRound?" round-current":"")} key={r}>
-            <div className="round-label">{r===bracket.rounds.length-1 ? "결승" : `${r+1}라운드`}</div>
+        {stageKeys.map(s=>(
+          <div className={"round-block" + (s===currentStage?" round-current":"")} key={s}>
+            <div className="round-label">{s===maxStage ? "결승" : `${s}라운드`}</div>
             <div className="round-row">
-              {round.map((m, i)=>{
+              {stageGroups[s].map(({r,i,m})=>{
                 const aId = getSlotTeam(bracket, r, i, "A");
                 const bId = getSlotTeam(bracket, r, i, "B");
                 const aTeam = aId ? teamsById[aId] : null;
