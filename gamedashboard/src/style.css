@@ -114,8 +114,12 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .team-chip{display:flex;align-items:center;gap:10px;}
 .team-avatar{width:51px;height:51px;border-radius:50%;object-fit:cover;background:#1c3a68;flex:none;border:2px solid rgba(255,255,255,.25);}
 .team-avatar.big{width:78px;height:78px;}
+.team-avatar.champion,.dot.champion{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,209,102,.5),0 0 12px rgba(255,209,102,.6);}
 .team-name{font-weight:800;}
 .exec-badge{font-size:10px;font-weight:900;color:#241a00;background:var(--gold);border-radius:6px;padding:2px 6px;flex:none;}
+/* the winner of a day's final (or 1등 on the ranking day) — a crown so
+   the overall champion is obvious at a glance, not just "gold text". */
+.crown{font-size:16px;line-height:1;flex:none;filter:drop-shadow(0 0 4px rgba(255,209,102,.7));}
 
 /* ---------- overall top9 (compact, top-right, all 9 visible at once) ---------- */
 .top9-compact{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;min-width:400px;flex:none;}

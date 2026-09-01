@@ -373,13 +373,14 @@ function useLocalState(){
 }
 
 /* ============================== small components ============================== */
-function TeamChip({team, size, exec}){
+function TeamChip({team, size, exec, champion}){
   if(!team) return <span className="slot tbd">TBD</span>;
   return (
     <span className="team-chip">
+      {champion && <span className="crown" title="우승">👑</span>}
       {team.image
-        ? <img className={"team-avatar" + (size==="big"?" big":"")} src={team.image} />
-        : <span className="dot" style={{width:size==="big"?52:22,height:size==="big"?52:22,borderRadius:"50%",background:team.color,flex:"none",border:"2px solid rgba(255,255,255,.25)"}}></span>}
+        ? <img className={"team-avatar" + (size==="big"?" big":"") + (champion?" champion":"")} src={team.image} />
+        : <span className={"dot" + (champion?" champion":"")} style={{width:size==="big"?52:22,height:size==="big"?52:22,borderRadius:"50%",background:team.color,flex:"none",border:"2px solid rgba(255,255,255,.25)"}}></span>}
       <span className="team-name">{team.name}</span>
       {exec && <span className="exec-badge" title={`임원 참여 ×${EXEC_MULTIPLIER}`}>⚡×{EXEC_MULTIPLIER}</span>}
     </span>
@@ -532,6 +533,7 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
           const bTeam = bId ? teamsById[bId] : null;
           const canPick = editable && aTeam && bTeam;
           const rowClass = (tid)=> tid && m.winnerId ? (tid===m.winnerId?"slot winner":"slot loser") : "slot";
+          const isChampion = (tid)=> id===bracket.rootId && !!tid && tid===m.winnerId;
           const pick = (teamId)=>{
             if(!canPick) return;
             const changing = !!m.winnerId && m.winnerId!==teamId;
@@ -551,17 +553,17 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
                 <button className="match-reset-btn" onClick={resetWinner} title="승자 초기화">↺</button>}
               {canPick ? (
                 <button className="slot-btn" onClick={()=>pick(aId)}>
-                  <span className={rowClass(aId)} style={{width:"100%"}}><TeamChip team={aTeam} exec={isExec(aId)} /></span>
+                  <span className={rowClass(aId)} style={{width:"100%"}}><TeamChip team={aTeam} exec={isExec(aId)} champion={isChampion(aId)} /></span>
                 </button>
               ) : (
-                <div className={rowClass(aId) + (!aTeam?" tbd":"")}><TeamChip team={aTeam} exec={isExec(aId)} /></div>
+                <div className={rowClass(aId) + (!aTeam?" tbd":"")}><TeamChip team={aTeam} exec={isExec(aId)} champion={isChampion(aId)} /></div>
               )}
               {canPick ? (
                 <button className="slot-btn" onClick={()=>pick(bId)}>
-                  <span className={rowClass(bId)} style={{width:"100%"}}><TeamChip team={bTeam} exec={isExec(bId)} /></span>
+                  <span className={rowClass(bId)} style={{width:"100%"}}><TeamChip team={bTeam} exec={isExec(bId)} champion={isChampion(bId)} /></span>
                 </button>
               ) : (
-                <div className={rowClass(bId) + (!bTeam?" tbd":"")}><TeamChip team={bTeam} exec={isExec(bId)} /></div>
+                <div className={rowClass(bId) + (!bTeam?" tbd":"")}><TeamChip team={bTeam} exec={isExec(bId)} champion={isChampion(bId)} /></div>
               )}
               {renderExtra && aTeam && bTeam && renderExtra(m, id)}
             </div>
@@ -588,7 +590,7 @@ function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime }){
         return (
           <div className={"rank-row " + rc} key={e.teamId}>
             <div className="rank-num">{e.rank || "-"}</div>
-            <TeamChip team={t} exec={execTeamIds && execTeamIds.includes(e.teamId)} />
+            <TeamChip team={t} exec={execTeamIds && execTeamIds.includes(e.teamId)} champion={e.rank===1} />
             {showTimeInput ? (
               <input type="text" className="rank-time-input" placeholder="mm:ss"
                 defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}
@@ -876,7 +878,7 @@ function DayTab({ dayKey, state, update, teamsById }){
           return (
             <div className="rank-edit-row" key={e.teamId}>
               <div style={{width:30,textAlign:"center",fontWeight:900,color:"var(--gold)"}}>{rankOf[e.teamId]||"-"}</div>
-              <TeamChip team={t} exec={execTeamIds.includes(e.teamId)} />
+              <TeamChip team={t} exec={execTeamIds.includes(e.teamId)} champion={rankOf[e.teamId]===1} />
               {dayState.mode!=="manual"
                 ? <input type="text" style={{marginLeft:"auto",width:100}} placeholder="mm:ss"
                     defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}

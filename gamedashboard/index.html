@@ -122,8 +122,12 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .team-chip{display:flex;align-items:center;gap:10px;}
 .team-avatar{width:51px;height:51px;border-radius:50%;object-fit:cover;background:#1c3a68;flex:none;border:2px solid rgba(255,255,255,.25);}
 .team-avatar.big{width:78px;height:78px;}
+.team-avatar.champion,.dot.champion{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,209,102,.5),0 0 12px rgba(255,209,102,.6);}
 .team-name{font-weight:800;}
 .exec-badge{font-size:10px;font-weight:900;color:#241a00;background:var(--gold);border-radius:6px;padding:2px 6px;flex:none;}
+/* the winner of a day's final (or 1등 on the ranking day) — a crown so
+   the overall champion is obvious at a glance, not just "gold text". */
+.crown{font-size:16px;line-height:1;flex:none;filter:drop-shadow(0 0 4px rgba(255,209,102,.7));}
 
 /* ---------- overall top9 (compact, top-right, all 9 visible at once) ---------- */
 .top9-compact{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;min-width:400px;flex:none;}
@@ -1037,18 +1041,22 @@ function useLocalState() {
 function TeamChip({
   team,
   size,
-  exec
+  exec,
+  champion
 }) {
   if (!team) return /*#__PURE__*/React.createElement("span", {
     className: "slot tbd"
   }, "TBD");
   return /*#__PURE__*/React.createElement("span", {
     className: "team-chip"
-  }, team.image ? /*#__PURE__*/React.createElement("img", {
-    className: "team-avatar" + (size === "big" ? " big" : ""),
+  }, champion && /*#__PURE__*/React.createElement("span", {
+    className: "crown",
+    title: "\uC6B0\uC2B9"
+  }, "\uD83D\uDC51"), team.image ? /*#__PURE__*/React.createElement("img", {
+    className: "team-avatar" + (size === "big" ? " big" : "") + (champion ? " champion" : ""),
     src: team.image
   }) : /*#__PURE__*/React.createElement("span", {
-    className: "dot",
+    className: "dot" + (champion ? " champion" : ""),
     style: {
       width: size === "big" ? 52 : 22,
       height: size === "big" ? 52 : 22,
@@ -1308,6 +1316,7 @@ function BracketBoard({
     const bTeam = bId ? teamsById[bId] : null;
     const canPick = editable && aTeam && bTeam;
     const rowClass = tid => tid && m.winnerId ? tid === m.winnerId ? "slot winner" : "slot loser" : "slot";
+    const isChampion = tid => id === bracket.rootId && !!tid && tid === m.winnerId;
     const pick = teamId => {
       if (!canPick) return;
       const changing = !!m.winnerId && m.winnerId !== teamId;
@@ -1342,12 +1351,14 @@ function BracketBoard({
       }
     }, /*#__PURE__*/React.createElement(TeamChip, {
       team: aTeam,
-      exec: isExec(aId)
+      exec: isExec(aId),
+      champion: isChampion(aId)
     }))) : /*#__PURE__*/React.createElement("div", {
       className: rowClass(aId) + (!aTeam ? " tbd" : "")
     }, /*#__PURE__*/React.createElement(TeamChip, {
       team: aTeam,
-      exec: isExec(aId)
+      exec: isExec(aId),
+      champion: isChampion(aId)
     })), canPick ? /*#__PURE__*/React.createElement("button", {
       className: "slot-btn",
       onClick: () => pick(bId)
@@ -1358,12 +1369,14 @@ function BracketBoard({
       }
     }, /*#__PURE__*/React.createElement(TeamChip, {
       team: bTeam,
-      exec: isExec(bId)
+      exec: isExec(bId),
+      champion: isChampion(bId)
     }))) : /*#__PURE__*/React.createElement("div", {
       className: rowClass(bId) + (!bTeam ? " tbd" : "")
     }, /*#__PURE__*/React.createElement(TeamChip, {
       team: bTeam,
-      exec: isExec(bId)
+      exec: isExec(bId),
+      champion: isChampion(bId)
     })), renderExtra && aTeam && bTeam && renderExtra(m, id));
   })));
 }
@@ -1396,7 +1409,8 @@ function RankingBoard({
       className: "rank-num"
     }, e.rank || "-"), /*#__PURE__*/React.createElement(TeamChip, {
       team: t,
-      exec: execTeamIds && execTeamIds.includes(e.teamId)
+      exec: execTeamIds && execTeamIds.includes(e.teamId),
+      champion: e.rank === 1
     }), showTimeInput ? /*#__PURE__*/React.createElement("input", {
       type: "text",
       className: "rank-time-input",
@@ -1809,7 +1823,8 @@ function DayTab({
       }
     }, rankOf[e.teamId] || "-"), /*#__PURE__*/React.createElement(TeamChip, {
       team: t,
-      exec: execTeamIds.includes(e.teamId)
+      exec: execTeamIds.includes(e.teamId),
+      champion: rankOf[e.teamId] === 1
     }), dayState.mode !== "manual" ? /*#__PURE__*/React.createElement("input", {
       type: "text",
       style: {
