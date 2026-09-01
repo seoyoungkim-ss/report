@@ -78,7 +78,7 @@ input,select{font-family:inherit;}
 /* the round currently being played — called out so it's obvious at a
    glance which matches are live right now */
 .round-label.round-current{color:var(--gold);font-size:21px;text-shadow:0 0 14px rgba(255,209,102,.65);}
-.match{width:152px;justify-self:center;align-self:start;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
+.match{width:260px;justify-self:center;align-self:start;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
   border-radius:12px;padding:8px;margin:0;position:relative;transition:all .25s;}
 .match.decided{border-color:var(--cyan);box-shadow:0 0 18px rgba(38,224,217,.35);}
 .match.match-current{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,209,102,.45),0 0 16px rgba(255,209,102,.3);}
