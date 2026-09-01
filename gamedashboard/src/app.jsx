@@ -22,87 +22,97 @@ const RANK_POINTS = [5,4,3,2,2,2,1,1,1];
 const TIER_POINTS = [5,4,3,2,1];
 
 /* ============================== bracket utils ============================== */
+/* A bracket is a binary tree, built by recursively splitting the seed list
+   in half — not a padded power-of-2 grid. This is what makes the shape
+   match a normal hand-drawn tournament chart: as many real, direct
+   matchups as team count allows sit on the bottom row, and a bye is just
+   an ordinary leaf that happens to be the lone member of its half, so its
+   first game naturally lands one level up, at whatever height that is —
+   no separate "auto-decided bye box" concept needed anywhere.
+   bracket.nodes[id] = { id, a, b, winnerId, meta, parentId } where a/b are
+   each either { teamId } (a seed) or { matchId } (another node's eventual
+   winner). bracket.rootId is the final. */
 function buildBracket(teamIds){
-  const n = teamIds.length;
-  let size = 1; while(size<n) size*=2;
-  const totalR1 = size/2;
-  const byes = size - n;
-  const realMatches = totalR1 - byes;
-  let ti = 0;
-  const round1 = new Array(totalR1);
-  const makeBye = (idx)=>{
-    const team = teamIds[ti++];
-    round1[idx] = { id:`r0m${idx}`, teamAId:team, teamBId:null, winnerId:team, meta:{auto:true} };
+  let counter = 0;
+  const nodes = {};
+  const build = (ids, parentId)=>{
+    if(ids.length===1) return { teamId: ids[0] };
+    const mid = Math.floor(ids.length/2);
+    const id = `m${counter++}`;
+    const a = build(ids.slice(0,mid), id);
+    const b = build(ids.slice(mid), id);
+    nodes[id] = { id, a, b, winnerId:null, meta:{}, parentId: parentId||null };
+    return { matchId: id };
   };
-  // Byes go to the top seeds; the lowest-seeded teams play each other in
-  // round 1, with the very last seed held back so its bye lands right next
-  // to that match — e.g. with 9 teams: 1~6 get solo byes (paired 1v2,3v4,
-  // 5v6 in round 2), 7 plays 8, and the winner faces 9.
-  const leadingByes = byes>0 ? byes-1 : 0;
-  for(let i=0;i<leadingByes;i++) makeBye(i);
-  for(let i=0;i<realMatches;i++){
-    const idx = leadingByes+i;
-    round1[idx] = { id:`r0m${idx}`, teamAId:teamIds[ti++], teamBId:teamIds[ti++], winnerId:null, meta:{} };
-  }
-  if(byes>0) makeBye(totalR1-1);
-  const rounds = [round1];
-  let prevCount = totalR1, r = 1;
-  while(prevCount>1){
-    const cnt = prevCount/2;
-    const round = [];
-    for(let i=0;i<cnt;i++){
-      round.push({ id:`r${r}m${i}`, teamASource:{round:r-1,match:i*2}, teamBSource:{round:r-1,match:i*2+1}, winnerId:null, meta:{} });
-    }
-    rounds.push(round);
-    prevCount = cnt; r++;
-  }
-  return { rounds };
+  const root = build(teamIds, null);
+  return { nodes, rootId: root.matchId };
 }
-function getWinnerOf(bracket, round, idx){
-  const m = bracket.rounds[round] && bracket.rounds[round][idx];
+function getWinnerOf(bracket, matchId){
+  const m = matchId && bracket.nodes[matchId];
   return m ? (m.winnerId || null) : null;
 }
-function getSlotTeam(bracket, round, idx, side){
-  const m = bracket.rounds[round][idx];
-  if(side==="A"){
-    if(m.teamAId) return m.teamAId;
-    if(m.teamASource) return getWinnerOf(bracket, m.teamASource.round, m.teamASource.match);
-    return null;
-  } else {
-    if(m.teamBId) return m.teamBId;
-    if(m.teamBSource) return getWinnerOf(bracket, m.teamBSource.round, m.teamBSource.match);
-    return null;
+function getSideTeam(bracket, matchId, side){
+  const node = bracket.nodes[matchId];
+  const ref = side==="A" ? node.a : node.b;
+  if(ref.teamId) return ref.teamId;
+  return getWinnerOf(bracket, ref.matchId);
+}
+function clearDownstream(bracket, matchId){
+  const node = bracket.nodes[matchId];
+  const parentId = node.parentId;
+  if(!parentId) return;
+  const parent = bracket.nodes[parentId];
+  if(parent.winnerId){
+    parent.winnerId = null; parent.meta = {};
+    clearDownstream(bracket, parentId);
   }
 }
-function clearDownstream(bracket, round, idx){
-  const next = round+1;
-  if(!bracket.rounds[next]) return;
-  bracket.rounds[next].forEach((m,i)=>{
-    const depA = m.teamASource && m.teamASource.round===round && m.teamASource.match===idx;
-    const depB = m.teamBSource && m.teamBSource.round===round && m.teamBSource.match===idx;
-    if((depA||depB) && m.winnerId){
-      m.winnerId = null; m.meta = {};
-      clearDownstream(bracket, next, i);
-    }
-  });
-}
-/* The order buildBracket() consumed to fill round-1 slots (real matches'
-   A,B pairs first, then each bye's single team) — reconstructing it lets
-   the seeding editor show/re-permute "who sits where" per day. */
+/* The seed order buildBracket() consumed (an in-order walk of the tree's
+   leaves reproduces it exactly) — reconstructing it lets the seeding
+   editor show/re-permute "who sits where" per day. */
 function getRound1TeamOrder(bracket){
   const order = [];
-  bracket.rounds[0].forEach(m=>{
-    order.push(m.teamAId);
-    if(m.teamBId) order.push(m.teamBId);
-  });
+  const walk = (ref)=>{
+    if(ref.teamId){ order.push(ref.teamId); return; }
+    const node = bracket.nodes[ref.matchId];
+    walk(node.a); walk(node.b);
+  };
+  walk({ matchId: bracket.rootId });
   return order;
 }
 function bracketHasResults(bracket){
-  return bracket.rounds.some(round=>round.some(m=>{
-    const hasWinner = m.winnerId && !(m.meta && m.meta.auto);
+  return Object.values(bracket.nodes).some(m=>{
     const hasMeta = m.meta && (m.meta.firstMoverId || m.meta.setScore);
-    return hasWinner || hasMeta;
-  }));
+    return m.winnerId || hasMeta;
+  });
+}
+/* How many real decisions deep a match sits, counted from the leaves —
+   used to pick which visual row/label ("1라운드", "결승", …) it belongs
+   to. A match pairing two seeds directly is depth 1 regardless of where
+   in the tree it sits, so every "true first game" lines up together. */
+function matchDepth(bracket, matchId){
+  const node = bracket.nodes[matchId];
+  const childDepth = (ref)=> ref.teamId ? 0 : matchDepth(bracket, ref.matchId);
+  return 1 + Math.max(childDepth(node.a), childDepth(node.b));
+}
+/* Distance from this match up to the final, walking parent pointers —
+   used for scoring tiers, since it fairly reflects "how many more wins
+   would have reached the final" regardless of which branch a team is on. */
+function hopsToFinal(bracket, matchId){
+  let hops = 0, cur = bracket.nodes[matchId];
+  while(cur.parentId){ hops++; cur = bracket.nodes[cur.parentId]; }
+  return hops;
+}
+/* Inclusive [min,max] range of leaf seed-slots under this match, used to
+   size/position its box against the other matches at its depth. */
+function leafSpan(bracket, matchId, leafIndexOf){
+  const node = bracket.nodes[matchId];
+  const range = (ref)=> ref.teamId
+    ? [leafIndexOf[ref.teamId], leafIndexOf[ref.teamId]]
+    : leafSpan(bracket, ref.matchId, leafIndexOf);
+  const [aMin,aMax] = range(node.a);
+  const [bMin,bMax] = range(node.b);
+  return [Math.min(aMin,bMin), Math.max(aMax,bMax)];
 }
 
 /* ============================== default state ============================== */
@@ -144,30 +154,30 @@ function getRankedEntries(day3){
   return ranked;
 }
 /* Bracket placement has no 3rd-place playoff, so it collapses to 5 tiers
-   by the round a team was eliminated in (or champion, if never eliminated):
-   final winner / final loser / lost semifinal / lost the round before /
-   lost the round before that — TIER_POINTS' 5 values in order. Only
-   decided matches award points, so in-progress days show partial scores. */
+   by how close a team got to the final (champion / runner-up / lost a
+   match feeding the final / lost one match earlier than that / lost
+   earlier still) — TIER_POINTS' 5 values in order, using hopsToFinal so
+   the tiering is fair across branches of uneven depth (a team's very
+   first loss always lands in the same tier as anyone else's first loss,
+   regardless of how many rounds their particular bracket half needed).
+   Only decided matches award points, so in-progress days show partial
+   scores. */
 function computeBracketScores(dayState){
   const scores = {};
   const bracket = dayState.bracket;
-  const numRounds = bracket.rounds.length;
-  bracket.rounds.forEach((round, r)=>{
-    round.forEach((m,i)=>{
-      if(!m.winnerId) return;
-      const isBye = m.meta && m.meta.auto;
-      if(isBye) return; // a walkover eliminates nobody
-      const aId = getSlotTeam(bracket, r, i, "A");
-      const bId = getSlotTeam(bracket, r, i, "B");
-      const loserId = m.winnerId===aId ? bId : aId;
-      if(r === numRounds-1){
-        scores[m.winnerId] = TIER_POINTS[0];
-        if(loserId) scores[loserId] = TIER_POINTS[1];
-      } else if(loserId){
-        const tier = Math.min(numRounds - r, TIER_POINTS.length-1);
-        scores[loserId] = TIER_POINTS[tier];
-      }
-    });
+  Object.keys(bracket.nodes).forEach(matchId=>{
+    const m = bracket.nodes[matchId];
+    if(!m.winnerId) return;
+    const aId = getSideTeam(bracket, matchId, "A");
+    const bId = getSideTeam(bracket, matchId, "B");
+    const loserId = m.winnerId===aId ? bId : aId;
+    if(matchId === bracket.rootId){
+      scores[m.winnerId] = TIER_POINTS[0];
+      if(loserId) scores[loserId] = TIER_POINTS[1];
+    } else if(loserId){
+      const tier = Math.min(hopsToFinal(bracket, matchId)+1, TIER_POINTS.length-1);
+      scores[loserId] = TIER_POINTS[tier];
+    }
   });
   return scores;
 }
@@ -185,7 +195,7 @@ function firstPlaceTeamsOf(dayState, format){
     return getRankedEntries(dayState).filter(e=>e.rank===1).map(e=>e.teamId);
   }
   const bracket = dayState.bracket;
-  const final = bracket.rounds[bracket.rounds.length-1][0];
+  const final = bracket.nodes[bracket.rootId];
   return final.winnerId ? [final.winnerId] : [];
 }
 function computeOverall(state){
@@ -233,13 +243,24 @@ function bracketSheetRows(state, dayKey){
   if(d.hasFirstMover) header.push("선공");
   if(d.hasSetScore) header.push("세트스코어");
   const rows = [header];
-  bracket.rounds.forEach((round, r)=>{
-    const roundLabel = r===bracket.rounds.length-1 ? "결승" : `${r+1}라운드`;
-    round.forEach((m,i)=>{
-      const aId = getSlotTeam(bracket, r, i, "A");
-      const bId = getSlotTeam(bracket, r, i, "B");
+  const matchIds = Object.keys(bracket.nodes);
+  const depthOf = {}; matchIds.forEach(id=>{ depthOf[id] = matchDepth(bracket,id); });
+  const maxDepth = Math.max(...matchIds.map(id=>depthOf[id]));
+  const leafOrder = getRound1TeamOrder(bracket);
+  const leafIndexOf = {}; leafOrder.forEach((tid,idx)=>{ leafIndexOf[tid]=idx; });
+  const spanOf = {}; matchIds.forEach(id=>{ spanOf[id] = leafSpan(bracket,id,leafIndexOf); });
+  // earliest-playable matches first, left-to-right within a depth
+  matchIds.sort((x,y)=> depthOf[x]-depthOf[y] || spanOf[x][0]-spanOf[y][0]);
+  const matchNumInDepth = {};
+  matchIds.forEach(id=>{
+      const m = bracket.nodes[id];
+      const depth = depthOf[id];
+      const roundLabel = depth===maxDepth ? "결승" : `${depth}라운드`;
+      matchNumInDepth[depth] = (matchNumInDepth[depth]||0) + 1;
+      const aId = getSideTeam(bracket, id, "A");
+      const bId = getSideTeam(bracket, id, "B");
       const row = [
-        roundLabel, `${i+1}경기`,
+        roundLabel, `${matchNumInDepth[depth]}경기`,
         aId ? teamName(state,aId) : "-",
         bId ? teamName(state,bId) : "-",
         m.winnerId ? teamName(state,m.winnerId) : "-",
@@ -247,7 +268,6 @@ function bracketSheetRows(state, dayKey){
       if(d.hasFirstMover) row.push(m.meta && m.meta.firstMoverId ? teamName(state,m.meta.firstMoverId) : "-");
       if(d.hasSetScore) row.push(m.meta && m.meta.setScore ? m.meta.setScore : "-");
       rows.push(row);
-    });
   });
   return rows;
 }
@@ -397,87 +417,70 @@ const DAY_ILLUSTRATIONS = {
 };
 
 /* ============================== bracket board ============================== */
-/* Rounds stack bottom-to-top: round 1 at the bottom, the final at the top. */
+/* Every match is positioned individually — grid-row by its depth (1라운드
+   at the bottom, 결승 at the top) and grid-column by the span of leaf
+   seed-slots under it — rather than forced into uniform full-width rows.
+   That's what keeps every bend point honest: a box's column exactly
+   matches its own branch, so even a connector that spans more than one
+   row (a shorter branch reaching the final faster than a longer one)
+   never runs through a box it has nothing to do with. */
 function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner, renderExtra, execTeamIds }){
   const containerRef = useRef(null);
   const matchRefs = useRef({});
   const [lines, setLines] = useState([]);
-  const setRef = (r,i) => (el)=>{ matchRefs.current[`${r}-${i}`] = el; };
+  const setRef = (id) => (el)=>{ matchRefs.current[id] = el; };
   const isExec = (id)=> !!(id && execTeamIds && execTeamIds.includes(id));
 
-  // Group matches by "stage" rather than raw tree depth. A bye costs no
-  // waiting (that team is available immediately), so two byes meeting for
-  // the first time — even though that's technically one tree-level deeper
-  // than the bracket's one true round-1 match — belongs in the same
-  // "1라운드" row as any match that's a real first-round pairing. This is
-  // what actually matters on event day: every match with no result it's
-  // still waiting on is playable right now, and should say so.
-  const stageOf = {};
-  const stageOfMatch = (r,i)=>{
-    const key = `${r}-${i}`;
-    if(stageOf[key]!=null) return stageOf[key];
-    const m = bracket.rounds[r][i];
-    const srcStage = (src)=>{
-      if(!src) return 0;
-      const sm = bracket.rounds[src.round][src.match];
-      if(sm.meta && sm.meta.auto) return 0; // a bye is instant, no wait
-      return stageOfMatch(src.round, src.match);
-    };
-    const s = Math.max(srcStage(m.teamASource), srcStage(m.teamBSource)) + 1;
-    stageOf[key] = s;
-    return s;
-  };
-  const stageGroups = {};
-  bracket.rounds.forEach((round,r)=>round.forEach((m,i)=>{
-    if(m.meta && m.meta.auto) return; // byes render nowhere — folded into whichever real match they feed
-    const s = stageOfMatch(r,i);
-    (stageGroups[s] = stageGroups[s] || []).push({ r, i, m });
-  }));
-  const stageKeys = Object.keys(stageGroups).map(Number).sort((a,b)=>a-b);
-  const maxStage = stageKeys[stageKeys.length-1];
+  const matchIds = Object.keys(bracket.nodes);
+  const leafOrder = getRound1TeamOrder(bracket);
+  const leafIndexOf = {};
+  leafOrder.forEach((tid,idx)=>{ leafIndexOf[tid] = idx; });
+  const leafCount = leafOrder.length;
 
-  // the stage currently being played: the earliest stage with a real match
-  // (both teams known) that hasn't been decided yet.
-  let currentStage = -1;
-  for(const s of stageKeys){
-    const pending = stageGroups[s].some(({r,i,m})=>{
-      if(m.winnerId) return false;
-      const aId = getSlotTeam(bracket, r, i, "A");
-      const bId = getSlotTeam(bracket, r, i, "B");
-      return aId && bId;
-    });
-    if(pending){ currentStage = s; break; }
-  }
+  const depthOf = {};
+  matchIds.forEach(id=>{ depthOf[id] = matchDepth(bracket, id); });
+  const maxDepth = Math.max(...matchIds.map(id=>depthOf[id]));
+
+  const spanOf = {};
+  matchIds.forEach(id=>{ spanOf[id] = leafSpan(bracket, id, leafIndexOf); });
+
+  // the matches currently playable: the shallowest depth with an
+  // undecided match whose both sides are already known.
+  let currentIds = [];
+  let currentDepth = Infinity;
+  matchIds.forEach(id=>{
+    const m = bracket.nodes[id];
+    if(m.winnerId) return;
+    const aId = getSideTeam(bracket, id, "A");
+    const bId = getSideTeam(bracket, id, "B");
+    if(!aId || !bId) return;
+    if(depthOf[id] < currentDepth){ currentDepth = depthOf[id]; currentIds = [id]; }
+    else if(depthOf[id] === currentDepth){ currentIds.push(id); }
+  });
 
   const recompute = useCallback(()=>{
     const cont = containerRef.current;
     if(!cont) return;
     const cRect = cont.getBoundingClientRect();
     const newLines = [];
-    bracket.rounds.forEach((round, r)=>{
-      if(r === bracket.rounds.length-1) return;
-      const nextRound = bracket.rounds[r+1];
-      round.forEach((m, i)=>{
-        if(m.meta && m.meta.auto) return; // a bye has no box on screen to draw a line from
-        const targetIdx = nextRound.findIndex(nm =>
-          (nm.teamASource && nm.teamASource.round===r && nm.teamASource.match===i) ||
-          (nm.teamBSource && nm.teamBSource.round===r && nm.teamBSource.match===i));
-        if(targetIdx<0) return;
-        const srcEl = matchRefs.current[`${r}-${i}`];
-        const tgtEl = matchRefs.current[`${r+1}-${targetIdx}`];
-        if(!srcEl || !tgtEl) return;
-        const sr = srcEl.getBoundingClientRect(), tr = tgtEl.getBoundingClientRect();
-        // source sits below target (or level with it, if they share a
-        // visual row's stage): line exits the top of the source box and
-        // enters the bottom of the target box.
-        newLines.push({
-          x1: sr.left + sr.width/2 - cRect.left, y1: sr.top - cRect.top,
-          x2: tr.left + tr.width/2 - cRect.left, y2: tr.bottom - cRect.top,
-          decided: !!round[i].winnerId,
-        });
+    matchIds.forEach(id=>{
+      const node = bracket.nodes[id];
+      if(!node.parentId) return; // the final has nothing above it
+      const srcEl = matchRefs.current[id];
+      const tgtEl = matchRefs.current[node.parentId];
+      if(!srcEl || !tgtEl) return;
+      const sr = srcEl.getBoundingClientRect(), tr = tgtEl.getBoundingClientRect();
+      // source sits below its parent (possibly several rows below, on a
+      // branch shorter than its sibling): line exits the top of the
+      // source box and enters the bottom of the parent's box.
+      newLines.push({
+        x1: sr.left + sr.width/2 - cRect.left, y1: sr.top - cRect.top,
+        x2: tr.left + tr.width/2 - cRect.left, y2: tr.bottom - cRect.top,
+        decided: !!node.winnerId,
       });
     });
     setLines(newLines);
+  // eslint-disable-next-line
   },[bracket]);
 
   useLayoutEffect(()=>{
@@ -502,7 +505,8 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
 
   return (
     <div className="bracket-scroll">
-      <div className="bracket" ref={containerRef}>
+      <div className="bracket-grid" ref={containerRef}
+        style={{ gridTemplateColumns:`repeat(${leafCount}, var(--bracket-col))`, gridTemplateRows:`repeat(${maxDepth*2}, auto)` }}>
         <svg className="connectors">
           {lines.map((l,idx)=>{
             const midY = (l.y1+l.y2)/2;
@@ -510,59 +514,61 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
             return <path key={idx} d={d} className={l.decided?"decided":""} />;
           })}
         </svg>
-        {stageKeys.map(s=>(
-          <div className={"round-block" + (s===currentStage?" round-current":"")} key={s}>
-            <div className="round-label">{s===maxStage ? "결승" : `${s}라운드`}</div>
-            <div className="round-row">
-              {stageGroups[s].map(({r,i,m})=>{
-                const aId = getSlotTeam(bracket, r, i, "A");
-                const bId = getSlotTeam(bracket, r, i, "B");
-                const aTeam = aId ? teamsById[aId] : null;
-                const bTeam = bId ? teamsById[bId] : null;
-                const isBye = m.meta && m.meta.auto;
-                const canPick = editable && !isBye && aTeam && bTeam;
-                const rowClass = (id)=> id && m.winnerId ? (id===m.winnerId?"slot winner":"slot loser") : "slot";
-                const pick = (teamId)=>{
-                  if(!canPick) return;
-                  const changing = !!m.winnerId && m.winnerId!==teamId;
-                  if(changing && !window.confirm("정말 변경하시겠습니까? 다음 라운드에 반영된 결과도 함께 초기화됩니다.")) return;
-                  onSetWinner(r, i, teamId);
-                };
-                const canReset = editable && !isBye && m.winnerId;
-                const resetWinner = (e)=>{
-                  e.stopPropagation();
-                  if(!window.confirm("승자를 초기화할까요? 다음 라운드에 반영된 결과도 함께 초기화됩니다.")) return;
-                  onResetWinner(r, i);
-                };
-                return (
-                  <div className={"match" + (m.winnerId?" decided":"")} key={m.id} ref={setRef(r,i)}>
-                    {canReset &&
-                      <button className="match-reset-btn" onClick={resetWinner} title="승자 초기화">↺</button>}
-                    {canPick ? (
-                      <button className="slot-btn" onClick={()=>pick(aId)}>
-                        <span className={rowClass(aId)} style={{width:"100%"}}><TeamChip team={aTeam} exec={isExec(aId)} /></span>
-                      </button>
-                    ) : (
-                      <div className={rowClass(aId) + (!aTeam?" tbd":"")}><TeamChip team={aTeam} exec={isExec(aId)} /></div>
-                    )}
-                    {canPick ? (
-                      <button className="slot-btn" onClick={()=>pick(bId)}>
-                        <span className={rowClass(bId)} style={{width:"100%"}}><TeamChip team={bTeam} exec={isExec(bId)} /></span>
-                      </button>
-                    ) : (
-                      // a bye's second slot never gets an opponent — "TBD" would
-                      // wrongly imply one is still coming, so hide it instead
-                      // (kept in the DOM, same height, so match cards in a round
-                      // still line up evenly for the connector lines).
-                      <div className={rowClass(bId) + (!bTeam?" tbd":"") + (isBye?" slot-hidden":"")}><TeamChip team={bTeam} exec={isExec(bId)} /></div>
-                    )}
-                    {renderExtra && aTeam && bTeam && !isBye && renderExtra(m, r, i)}
-                  </div>
-                );
-              })}
+        {Array.from({length:maxDepth},(_,k)=>k+1).map(depth=>{
+          const labelRow = (maxDepth-depth)*2 + 1;
+          return (
+            <div className={"round-label" + (depth===currentDepth?" round-current":"")} key={"label"+depth}
+              style={{ gridColumn:"1 / -1", gridRow:labelRow }}>
+              {depth===currentDepth ? "▶ " : ""}{depth===maxDepth ? "결승" : `${depth}라운드`}
             </div>
-          </div>
-        ))}
+          );
+        })}
+        {matchIds.map(id=>{
+          const m = bracket.nodes[id];
+          const [minL, maxL] = spanOf[id];
+          const depth = depthOf[id];
+          const gridRow = (maxDepth-depth)*2 + 2;
+          const aId = getSideTeam(bracket, id, "A");
+          const bId = getSideTeam(bracket, id, "B");
+          const aTeam = aId ? teamsById[aId] : null;
+          const bTeam = bId ? teamsById[bId] : null;
+          const canPick = editable && aTeam && bTeam;
+          const rowClass = (tid)=> tid && m.winnerId ? (tid===m.winnerId?"slot winner":"slot loser") : "slot";
+          const pick = (teamId)=>{
+            if(!canPick) return;
+            const changing = !!m.winnerId && m.winnerId!==teamId;
+            if(changing && !window.confirm("정말 변경하시겠습니까? 다음 라운드에 반영된 결과도 함께 초기화됩니다.")) return;
+            onSetWinner(id, teamId);
+          };
+          const canReset = editable && m.winnerId;
+          const resetWinner = (e)=>{
+            e.stopPropagation();
+            if(!window.confirm("승자를 초기화할까요? 다음 라운드에 반영된 결과도 함께 초기화됩니다.")) return;
+            onResetWinner(id);
+          };
+          return (
+            <div className={"match" + (m.winnerId?" decided":"") + (currentIds.includes(id)?" match-current":"")}
+              key={id} ref={setRef(id)} style={{ gridColumn:`${minL+1} / ${maxL+2}`, gridRow }}>
+              {canReset &&
+                <button className="match-reset-btn" onClick={resetWinner} title="승자 초기화">↺</button>}
+              {canPick ? (
+                <button className="slot-btn" onClick={()=>pick(aId)}>
+                  <span className={rowClass(aId)} style={{width:"100%"}}><TeamChip team={aTeam} exec={isExec(aId)} /></span>
+                </button>
+              ) : (
+                <div className={rowClass(aId) + (!aTeam?" tbd":"")}><TeamChip team={aTeam} exec={isExec(aId)} /></div>
+              )}
+              {canPick ? (
+                <button className="slot-btn" onClick={()=>pick(bId)}>
+                  <span className={rowClass(bId)} style={{width:"100%"}}><TeamChip team={bTeam} exec={isExec(bId)} /></span>
+                </button>
+              ) : (
+                <div className={rowClass(bId) + (!bTeam?" tbd":"")}><TeamChip team={bTeam} exec={isExec(bId)} /></div>
+              )}
+              {renderExtra && aTeam && bTeam && renderExtra(m, id)}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -717,29 +723,29 @@ function InteractiveBracketSection({ dayKey, state, update, teamsById }){
   const dayState = state.days[dayKey];
   const execTeamIds = state.scoring[dayKey].execTeams;
 
-  const setWinner = (r,i,teamId)=> update(s=>{
+  const setWinner = (matchId,teamId)=> update(s=>{
     const b = s.days[dayKey].bracket;
-    const m = b.rounds[r][i];
+    const m = b.nodes[matchId];
     if(m.winnerId===teamId) return null;
     m.winnerId = teamId;
-    clearDownstream(b, r, i);
+    clearDownstream(b, matchId);
     return s;
   });
-  const resetWinner = (r,i)=> update(s=>{
+  const resetWinner = (matchId)=> update(s=>{
     const b = s.days[dayKey].bracket;
-    const m = b.rounds[r][i];
+    const m = b.nodes[matchId];
     if(!m.winnerId) return null;
     m.winnerId = null;
-    clearDownstream(b, r, i);
+    clearDownstream(b, matchId);
     return s;
   });
-  const setMeta = (r,i,patch)=> update(s=>{
-    const m = s.days[dayKey].bracket.rounds[r][i];
+  const setMeta = (matchId,patch)=> update(s=>{
+    const m = s.days[dayKey].bracket.nodes[matchId];
     m.meta = { ...m.meta, ...patch };
     return s;
   });
-  const resetMeta = (r,i,keys)=> update(s=>{
-    const m = s.days[dayKey].bracket.rounds[r][i];
+  const resetMeta = (matchId,keys)=> update(s=>{
+    const m = s.days[dayKey].bracket.nodes[matchId];
     const meta = { ...m.meta };
     keys.forEach(k=>delete meta[k]);
     m.meta = meta;
@@ -754,20 +760,20 @@ function InteractiveBracketSection({ dayKey, state, update, teamsById }){
       execTeamIds={execTeamIds}
       onSetWinner={setWinner}
       onResetWinner={resetWinner}
-      renderExtra={(m,r,i)=>{
-        const aId = getSlotTeam(dayState.bracket, r, i, "A");
-        const bId = getSlotTeam(dayState.bracket, r, i, "B");
+      renderExtra={(m,matchId)=>{
+        const aId = getSideTeam(dayState.bracket, matchId, "A");
+        const bId = getSideTeam(dayState.bracket, matchId, "B");
         return (
           <div>
             {info.hasFirstMover &&
               <FirstMoverPicker match={m} teamsById={teamsById} aId={aId} bId={bId}
-                onUpdate={(patch)=>setMeta(r,i,patch)}
-                onReset={()=>resetMeta(r,i,["firstMoverId","firstMoverLabel"])} />}
+                onUpdate={(patch)=>setMeta(matchId,patch)}
+                onReset={()=>resetMeta(matchId,["firstMoverId","firstMoverLabel"])} />}
             {info.hasSetScore &&
               <SetScorePicker match={m} aId={aId} bId={bId}
-                onUpdate={(patch)=>setMeta(r,i,patch)}
-                onWinner={(teamId)=>setWinner(r,i,teamId)}
-                onReset={()=>resetMeta(r,i,["setScore","setA","setB"])} />}
+                onUpdate={(patch)=>setMeta(matchId,patch)}
+                onWinner={(teamId)=>setWinner(matchId,teamId)}
+                onReset={()=>resetMeta(matchId,["setScore","setA","setB"])} />}
           </div>
         );
       }}
