@@ -312,6 +312,51 @@ function buildResultWorkbook(state){
   });
   return wb;
 }
+/* A single day's own results — a smaller, focused file meant to be
+   attached alongside the poster prompt below, rather than the full
+   4-day export. */
+function buildDayResultWorkbook(state, dayKey){
+  const d = dayInfo(dayKey);
+  const wb = XLSX.utils.book_new();
+  const ranking = computeTodayRanking(state, dayKey);
+  const rankRows = [["순위","팀명","오늘 점수"], ...ranking.map(t=>[t.rank, t.name, t.score])];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rankRows), safeSheetName("오늘 순위"));
+  const detailRows = d.format==="ranking" ? rankingSheetRows(state, dayKey) : bracketSheetRows(state, dayKey);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailRows), safeSheetName(`${d.label} 상세`));
+  return wb;
+}
+/* Plain-text prompt (for pasting into an image-generating AI later,
+   outside this offline app) summarizing the day's winner and full
+   ranking, meant to be downloaded alongside buildDayResultWorkbook(). */
+function buildPosterPrompt(state, dayKey){
+  const d = dayInfo(dayKey);
+  const dayState = state.days[dayKey];
+  const ranking = computeTodayRanking(state, dayKey);
+  // The point-tier ranking above is score-based, so mid-tournament a team
+  // that already lost its first match can outrank teams still alive but
+  // not yet eliminated (they haven't scored yet). That's correct for a
+  // live leaderboard but wrong for "who won" — use the bracket's actual
+  // decided final (or, for the ranking day, whoever holds rank 1) instead,
+  // and say so plainly if the day isn't finished yet.
+  const championIds = firstPlaceTeamsOf(dayState, d.format);
+  const championName = championIds.length ? teamName(state, championIds[0]) : "(아직 결정되지 않음 — 결승/최종 순위 확정 후 다시 받아주세요)";
+  const rankingLines = ranking.map(t=>`${t.rank}위 — ${t.name} (${t.score}점)`).join("\n");
+  return [
+    `[썸머탈출 페스티벌 ${d.label} 축하 포스터 제작 요청]`,
+    ``,
+    `아래 정보를 반영해서, 여름 휴양지/페스티벌 분위기의 밝고 역동적인 사내 행사 축하 포스터를 만들어주세요.`,
+    ``,
+    `- 행사: 썸머탈출 페스티벌 ${d.label} · ${d.game}`,
+    `- 날짜/장소: ${d.date} · ${d.place}`,
+    `- 오늘의 우승팀: ${championName} 🏆`,
+    ``,
+    `[오늘 전체 순위]`,
+    rankingLines,
+    ``,
+    `우승팀 이름과 트로피/왕관 이미지를 가장 크고 눈에 띄게 배치하고, 나머지 순위도 보기 좋게 함께 넣어주세요.`,
+    `참고: 함께 첨부한 엑셀 파일에 이 Day의 상세 경기 결과(대진표/세트 스코어 등)가 들어있으니 필요하면 참고하세요.`,
+  ].join("\n");
+}
 
 /* ============================== misc utils ============================== */
 function fmtTime(sec){
@@ -1080,6 +1125,30 @@ function ControlTab({ state, update }){
       window.alert("엑셀 생성에 실패했습니다: " + (e && e.message ? e.message : e));
     }
   };
+  const activeDay = dayInfo(state.display.activeDayKey);
+  const exportDayExcel = ()=>{
+    try{
+      const wb = buildDayResultWorkbook(state, state.display.activeDayKey);
+      const stamp = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `썸머탈출페스티벌_${activeDay.label}_결과_${stamp}.xlsx`);
+    }catch(e){
+      window.alert("엑셀 생성에 실패했습니다: " + (e && e.message ? e.message : e));
+    }
+  };
+  const downloadPosterPrompt = ()=>{
+    try{
+      const text = buildPosterPrompt(state, state.display.activeDayKey);
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `썸머탈출페스티벌_${activeDay.label}_포스터프롬프트.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }catch(e){
+      window.alert("프롬프트 생성에 실패했습니다: " + (e && e.message ? e.message : e));
+    }
+  };
   return (
     <div className="card">
       <h3>송출 화면 제어</h3>
@@ -1090,6 +1159,16 @@ function ControlTab({ state, update }){
             {d.label} · {d.game}
           </button>
         ))}
+      </div>
+      <div style={{marginTop:18,paddingTop:16,borderTop:"1px dashed var(--line)"}}>
+        <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
+          선택된 Day({activeDay.label} · {activeDay.game})의 결과로 포스터 제작용 프롬프트와 엑셀을 내려받습니다.
+          프롬프트 파일을 열어 이미지 생성 AI에 붙여넣고, 엑셀 파일을 함께 첨부하세요.
+        </p>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button className="small-btn" onClick={downloadPosterPrompt}>🖼️ 포스터 프롬프트 다운로드 (.txt)</button>
+          <button className="small-btn" onClick={exportDayExcel}>📊 {activeDay.label} 결과 엑셀 다운로드</button>
+        </div>
       </div>
       <div style={{marginTop:18,paddingTop:16,borderTop:"1px dashed var(--line)"}}>
         <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
