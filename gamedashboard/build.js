@@ -54,6 +54,7 @@ const dataUri = (file) =>
     .toString("base64")}`;
 const gameImages = {
   jenga: dataUri("jenga.png"),
+  kart: dataUri("kart.png"),
   curling: dataUri("curling.png"),
   jumprope: dataUri("jumprope.png"),
   pingpong: dataUri("pingpong.png"),

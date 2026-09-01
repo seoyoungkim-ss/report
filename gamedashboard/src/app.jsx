@@ -391,24 +391,7 @@ function JengaIllustration({size}){
   return <img src={GAME_IMAGES.jenga} alt="" style={{width:size, height:"auto"}} />;
 }
 function KartIllustration({size}){
-  return (
-    <svg width={size} height={size} viewBox="0 0 120 120">
-      <g strokeLinecap="round" opacity=".85">
-        <line x1="-4" y1="42" x2="12" y2="42" stroke="#eaf7ff" strokeWidth="4"/>
-        <line x1="-4" y1="58" x2="16" y2="58" stroke="#eaf7ff" strokeWidth="4"/>
-        <line x1="-4" y1="74" x2="10" y2="74" stroke="#eaf7ff" strokeWidth="4"/>
-      </g>
-      <path d="M15,80 Q15,63 36,61 L74,59 Q97,59 102,77 L102,86 Q102,91 97,91 L20,91 Q15,91 15,86 Z"
-        fill="#ff7a29" stroke="#7a3d00" strokeWidth="2" strokeLinejoin="round"/>
-      <rect x="90" y="55" width="12" height="12" rx="3" fill="#ff5c5c" stroke="#7a1010" strokeWidth="1.5"/>
-      <circle cx="64" cy="50" r="11" fill="#26e0d9" stroke="#0b3a63" strokeWidth="2"/>
-      <path d="M56,48 Q64,44 72,48" stroke="#0b3a63" strokeWidth="2" fill="none" strokeLinecap="round"/>
-      <circle cx="33" cy="92" r="13" fill="#22314f" stroke="#0b3a63" strokeWidth="1.5"/>
-      <circle cx="33" cy="92" r="5" fill="#cfd8e6"/>
-      <circle cx="86" cy="92" r="13" fill="#22314f" stroke="#0b3a63" strokeWidth="1.5"/>
-      <circle cx="86" cy="92" r="5" fill="#cfd8e6"/>
-    </svg>
-  );
+  return <img src={GAME_IMAGES.kart} alt="" style={{width:size, height:"auto"}} />;
 }
 function JumpRopeIllustration({size}){
   return <img src={GAME_IMAGES.jumprope} alt="" style={{width:size, height:"auto"}} />;
