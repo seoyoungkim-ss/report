@@ -86,7 +86,7 @@ input,select{font-family:inherit;}
 /* the round currently being played — called out so it's obvious at a
    glance which matches are live right now */
 .round-label.round-current{color:var(--gold);font-size:21px;text-shadow:0 0 14px rgba(255,209,102,.65);}
-.match{width:152px;justify-self:center;align-self:center;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
+.match{width:152px;justify-self:center;align-self:start;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
   border-radius:12px;padding:8px;margin:0;position:relative;transition:all .25s;}
 .match.decided{border-color:var(--cyan);box-shadow:0 0 18px rgba(38,224,217,.35);}
 .match.match-current{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,209,102,.45),0 0 16px rgba(255,209,102,.3);}
@@ -120,8 +120,8 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 
 /* ---------- team chip ---------- */
 .team-chip{display:flex;align-items:center;gap:10px;}
-.team-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;background:#1c3a68;flex:none;border:2px solid rgba(255,255,255,.25);}
-.team-avatar.big{width:52px;height:52px;}
+.team-avatar{width:51px;height:51px;border-radius:50%;object-fit:cover;background:#1c3a68;flex:none;border:2px solid rgba(255,255,255,.25);}
+.team-avatar.big{width:78px;height:78px;}
 .team-name{font-weight:800;}
 .exec-badge{font-size:10px;font-weight:900;color:#241a00;background:var(--gold);border-radius:6px;padding:2px 6px;flex:none;}
 
@@ -133,7 +133,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .top9c-chip.top3{background:rgba(255,122,41,.16);border-color:var(--orange);}
 .top9c-rank{font-weight:900;color:var(--sub);font-size:11px;width:13px;flex:none;}
 .top9c-chip.top3 .top9c-rank{color:var(--orange2);}
-.top9c-dot{width:14px;height:14px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.25);}
+.top9c-dot{width:21px;height:21px;border-radius:50%;flex:none;border:1px solid rgba(255,255,255,.25);}
 .top9c-name{font-weight:800;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .top9c-score{margin-left:auto;font-weight:900;font-size:12px;color:var(--cyan2);flex:none;}
 .gold-count{font-size:12px;color:var(--gold);font-weight:800;flex:none;}
