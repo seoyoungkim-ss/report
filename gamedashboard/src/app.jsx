@@ -224,6 +224,28 @@ function computeOverall(state){
     }))
     .sort((a,b)=> b.total-a.total || b.firstPlaceCount-a.firstPlaceCount);
 }
+/* Each team's rank for TODAY's specific game only, not the running
+   total — same scoring/exec-multiplier rule computeOverall uses for
+   this one day, so the number shown here is exactly what today added
+   to the cumulative score. Ties share a rank (1,2,2,4,…), the standard
+   "competition ranking" convention. */
+function computeTodayRanking(state, dayKey){
+  const d = dayInfo(dayKey);
+  const ds = state.days[dayKey], cfg = state.scoring[dayKey];
+  const raw = d.format==="ranking" ? computeRankingScores(ds) : computeBracketScores(ds);
+  const scored = state.teams
+    .map(t=>{
+      let v = raw[t.id]||0;
+      if(cfg.execTeams && cfg.execTeams.includes(t.id)) v = v*EXEC_MULTIPLIER;
+      return { ...t, score: Math.round(v*10)/10 };
+    })
+    .sort((a,b)=> b.score-a.score);
+  let rank = 0, prevScore = null;
+  return scored.map((t,i)=>{
+    if(t.score!==prevScore){ rank = i+1; prevScore = t.score; }
+    return { ...t, rank };
+  });
+}
 
 /* ============================== excel export ============================== */
 function teamName(state, id){
@@ -613,6 +635,7 @@ function DisplayView({ state, update }){
   const info = dayInfo(activeKey);
   const execTeamIds = state.scoring[activeKey].execTeams;
   const overall = useMemo(()=>computeOverall(state),[state]);
+  const todayRanking = useMemo(()=>computeTodayRanking(state, activeKey),[state, activeKey]);
   const setDay3Time = (teamId, val)=> update(s=>{
     const e = s.days.day3.entries.find(x=>x.teamId===teamId);
     e.timeSec = parseTimeInput(val);
@@ -635,19 +658,36 @@ function DisplayView({ state, update }){
             <div className="panel-title"><span className="bar"></span>오늘의 경기 현황 · {info.game}</div>
             <div className="exec-legend">⚡×{EXEC_MULTIPLIER} <b>임원 참여 2배룰 적용</b></div>
           </div>
-          <div className="top9-compact">
-            <div className="top9-compact-title">종합 순위 TOP 9</div>
-            <div className="top9-compact-grid">
-              {overall.map((t,idx)=>(
-                <div className={"top9c-chip" + (idx<3?" top3":"")} key={t.id} title={t.firstPlaceCount>0?`🥇×${t.firstPlaceCount}`:undefined}>
-                  <span className="top9c-rank">{idx+1}</span>
-                  {t.image
-                    ? <img className="top9c-dot" src={t.image} style={{objectFit:"cover"}} />
-                    : <span className="top9c-dot" style={{background:t.color}}></span>}
-                  <span className="top9c-name">{t.name}</span>
-                  <span className="top9c-score">{t.total}</span>
-                </div>
-              ))}
+          <div className="top9-stack">
+            <div className="top9-compact">
+              <div className="top9-compact-title">종합 순위 TOP 9 (누적)</div>
+              <div className="top9-compact-grid">
+                {overall.map((t,idx)=>(
+                  <div className={"top9c-chip" + (idx<3?" top3":"")} key={t.id} title={t.firstPlaceCount>0?`🥇×${t.firstPlaceCount}`:undefined}>
+                    <span className="top9c-rank">{idx+1}</span>
+                    {t.image
+                      ? <img className="top9c-dot" src={t.image} style={{objectFit:"cover"}} />
+                      : <span className="top9c-dot" style={{background:t.color}}></span>}
+                    <span className="top9c-name">{t.name}</span>
+                    <span className="top9c-score">{t.total}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="top9-compact">
+              <div className="top9-compact-title">오늘 · {info.game} 순위</div>
+              <div className="top9-compact-grid">
+                {todayRanking.map(t=>(
+                  <div className={"top9c-chip" + (t.rank<=3?" top3":"")} key={t.id}>
+                    <span className="top9c-rank">{t.rank}</span>
+                    {t.image
+                      ? <img className="top9c-dot" src={t.image} style={{objectFit:"cover"}} />
+                      : <span className="top9c-dot" style={{background:t.color}}></span>}
+                    <span className="top9c-name">{t.name}</span>
+                    <span className="top9c-score">{t.score}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
