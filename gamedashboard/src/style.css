@@ -30,10 +30,10 @@ body{background:var(--bg);color:var(--text);}
 .fest-hero{position:absolute;max-width:40%;display:flex;align-items:center;}
 /* ranking day (Day3): the list is short, so the bottom stays clear */
 .fest-hero-bottom{bottom:140px;right:11%;}
-/* bracket days: round 1 now spans full width bottom-to-top, so there's no
-   clear spot down there any more — tuck it up beside the (single, narrow)
-   final-round box instead, below the compact TOP9 box */
-.fest-hero-top{top:250px;right:5%;}
+/* bracket days: sits in the empty margin to the right of the bracket
+   grid (the grid's columns don't reach the viewport edge), below both
+   stacked TOP9 panels so it never sits under them */
+.fest-hero-top{top:480px;right:4%;}
 .fest-hero-item{display:flex;}
 .fest-hero-item svg,.fest-hero-item img{filter:drop-shadow(0 14px 20px rgba(4,20,40,.34));}
 button{font-family:inherit;cursor:pointer;}
