@@ -127,7 +127,10 @@ function createDefaultState(){
     days:{
       day1:{ bracket: buildBracket(teamIds) },
       day2:{ bracket: buildBracket(teamIds) },
-      day3:{ mode:"auto", entries: teamIds.map(id=>({teamId:id, timeSec:null, manualRank:null})) },
+      // entries' array order is the team-building course's turn order
+      // (index+1 = "몇 번째로 진행하는지") — independent of ranking, which
+      // is always computed from timeSec.
+      day3:{ entries: teamIds.map(id=>({teamId:id, timeSec:null})) },
       day4:{ bracket: buildBracket(teamIds) },
     },
     scoring:{
@@ -144,14 +147,17 @@ function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
 /* ============================== scoring ============================== */
 function getRankedEntries(day3){
   const entries = day3.entries;
-  if(day3.mode==="manual"){
-    return entries.map((e,i)=>({ teamId:e.teamId, rank: i+1, timeSec:e.timeSec }));
-  }
   const withTime = entries.filter(e=>e.timeSec!=null).sort((a,b)=>a.timeSec-b.timeSec);
   const withoutTime = entries.filter(e=>e.timeSec==null);
   const ranked = withTime.map((e,i)=>({teamId:e.teamId, rank:i+1, timeSec:e.timeSec}));
   withoutTime.forEach(e=>ranked.push({teamId:e.teamId, rank:null, timeSec:null}));
   return ranked;
+}
+/* day3.entries' array order = turn order (1부터) — independent of the
+   time-based ranking above; this is purely "who goes through the
+   team-building course when", not a scoring concept. */
+function turnOrderOf(day3){
+  return Object.fromEntries(day3.entries.map((e,i)=>[e.teamId, i+1]));
 }
 /* Bracket placement has no 3rd-place playoff, so it collapses to 5 tiers
    by how close a team got to the final (champion / runner-up / lost a
@@ -646,9 +652,8 @@ function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime }){
   const ranked = getRankedEntries(day3).slice().sort((a,b)=>{
     if(a.rank==null) return 1; if(b.rank==null) return -1; return a.rank-b.rank;
   });
-  // time input only makes sense in auto (완료 시간 기준) mode — manual mode's
-  // order is fixed by drag/dropdown rank, not by a recorded time.
-  const showTimeInput = editable && day3.mode!=="manual";
+  const turnOrder = turnOrderOf(day3);
+  const showTimeInput = editable;
   return (
     <div className="ranking-list">
       {ranked.map((e,idx)=>{
@@ -657,6 +662,7 @@ function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime }){
         return (
           <div className={"rank-row " + rc} key={e.teamId}>
             <div className="rank-num">{e.rank || "-"}</div>
+            <span className="turn-badge" title="진행순서">{turnOrder[e.teamId]}번째 진행</span>
             <TeamChip team={t} exec={execTeamIds && execTeamIds.includes(e.teamId)} champion={e.rank===1} />
             {showTimeInput ? (
               <input type="text" className="rank-time-input" placeholder="mm:ss"
@@ -926,19 +932,19 @@ function DayTab({ dayKey, state, update, teamsById }){
     );
   }
 
-  // day3 ranking editor
+  // day3 ranking editor — 진행순서(줄 세우는 순서)는 완전히 별개 개념이라
+  // 시간과 무관하게 관리자가 직접 정하고, 순위는 항상 완료 시간으로만 계산된다.
   const execTeamIds = state.scoring[dayKey].execTeams;
   const entries = dayState.entries;
-  const toggleMode = (mode)=> update(s=>{ s.days.day3.mode = mode; return s; });
   const setTime = (teamId, val)=> update(s=>{
     const e = s.days.day3.entries.find(x=>x.teamId===teamId);
     e.timeSec = parseTimeInput(val);
     return s;
   });
-  const setRank = (teamId, newRank)=> update(s=>{
+  const setTurnOrder = (teamId, newOrder)=> update(s=>{
     const arr = s.days.day3.entries;
     const idx = arr.findIndex(x=>x.teamId===teamId);
-    const newIdx = Math.max(0, Math.min(arr.length-1, newRank-1));
+    const newIdx = Math.max(0, Math.min(arr.length-1, newOrder-1));
     if(idx<0 || idx===newIdx) return null;
     const [item] = arr.splice(idx,1);
     arr.splice(newIdx,0,item);
@@ -946,6 +952,7 @@ function DayTab({ dayKey, state, update, teamsById }){
   });
   const ranked = getRankedEntries(dayState);
   const rankOf = Object.fromEntries(ranked.map(e=>[e.teamId,e.rank]));
+  const turnOrder = turnOrderOf(dayState);
 
   return (
     <div className="card">
@@ -953,25 +960,23 @@ function DayTab({ dayKey, state, update, teamsById }){
         <div className="title">{info.label} · {info.game}</div>
         <div className="sub">{info.date} · {info.place} · {info.unit}</div>
       </div>
-      <div style={{marginBottom:12,display:"flex",gap:8}}>
-        <button className={"small-btn" + (dayState.mode!=="manual"?" primary":"")} onClick={()=>toggleMode("auto")}>자동 정렬 (완료 시간 기준)</button>
-        <button className={"small-btn" + (dayState.mode==="manual"?" primary":"")} onClick={()=>toggleMode("manual")}>수동 순서 지정</button>
-      </div>
+      <p style={{color:"var(--sub)",fontSize:12,marginTop:-6,marginBottom:12}}>
+        진행순서는 팀빌딩 코스를 도는 순서(현장 대기열)이고, 순위는 완료 시간으로 자동 계산됩니다 — 서로 영향을 주지 않습니다.
+      </p>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {entries.map((e,idx)=>{
           const t = teamsById[e.teamId];
           return (
             <div className="rank-edit-row" key={e.teamId}>
+              <select value={turnOrder[e.teamId]} style={{width:90}}
+                onChange={(ev)=>setTurnOrder(e.teamId, parseInt(ev.target.value,10))}>
+                {entries.map((_,i)=><option key={i} value={i+1}>{i+1}번째</option>)}
+              </select>
               <div style={{width:30,textAlign:"center",fontWeight:900,color:"var(--gold)"}}>{rankOf[e.teamId]||"-"}</div>
               <TeamChip team={t} exec={execTeamIds.includes(e.teamId)} champion={rankOf[e.teamId]===1} />
-              {dayState.mode!=="manual"
-                ? <input type="text" style={{marginLeft:"auto",width:100}} placeholder="mm:ss"
-                    defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}
-                    onBlur={(ev)=>setTime(e.teamId, ev.target.value)} />
-                : <select style={{marginLeft:"auto",width:80}} value={rankOf[e.teamId]||idx+1}
-                    onChange={(ev)=>setRank(e.teamId, parseInt(ev.target.value,10))}>
-                    {entries.map((_,i)=><option key={i} value={i+1}>{i+1}위</option>)}
-                  </select>}
+              <input type="text" style={{marginLeft:"auto",width:100}} placeholder="mm:ss"
+                defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}
+                onBlur={(ev)=>setTime(e.teamId, ev.target.value)} />
             </div>
           );
         })}

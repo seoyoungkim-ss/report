@@ -113,6 +113,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .rank-row.r3{border-color:#e0a672;}
 .rank-num{font-size:22px;font-weight:900;width:38px;text-align:center;color:var(--sub);}
 .rank-row.r1 .rank-num{color:var(--gold);font-size:28px;}
+.turn-badge{font-size:11px;font-weight:700;color:var(--sub);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;flex:none;white-space:nowrap;}
 .rank-time{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--sub);font-weight:700;}
 .rank-time-input{margin-left:auto;width:110px;text-align:right;font-variant-numeric:tabular-nums;
   background:#081a34;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700;}
@@ -735,12 +736,13 @@ function createDefaultState() {
       day2: {
         bracket: buildBracket(teamIds)
       },
+      // entries' array order is the team-building course's turn order
+      // (index+1 = "몇 번째로 진행하는지") — independent of ranking, which
+      // is always computed from timeSec.
       day3: {
-        mode: "auto",
         entries: teamIds.map(id => ({
           teamId: id,
-          timeSec: null,
-          manualRank: null
+          timeSec: null
         }))
       },
       day4: {
@@ -773,13 +775,6 @@ function deepClone(o) {
 /* ============================== scoring ============================== */
 function getRankedEntries(day3) {
   const entries = day3.entries;
-  if (day3.mode === "manual") {
-    return entries.map((e, i) => ({
-      teamId: e.teamId,
-      rank: i + 1,
-      timeSec: e.timeSec
-    }));
-  }
   const withTime = entries.filter(e => e.timeSec != null).sort((a, b) => a.timeSec - b.timeSec);
   const withoutTime = entries.filter(e => e.timeSec == null);
   const ranked = withTime.map((e, i) => ({
@@ -793,6 +788,12 @@ function getRankedEntries(day3) {
     timeSec: null
   }));
   return ranked;
+}
+/* day3.entries' array order = turn order (1부터) — independent of the
+   time-based ranking above; this is purely "who goes through the
+   team-building course when", not a scoring concept. */
+function turnOrderOf(day3) {
+  return Object.fromEntries(day3.entries.map((e, i) => [e.teamId, i + 1]));
 }
 /* Bracket placement has no 3rd-place playoff, so it collapses to 5 tiers
    by how close a team got to the final (champion / runner-up / lost a
@@ -1460,9 +1461,8 @@ function RankingBoard({
     if (b.rank == null) return -1;
     return a.rank - b.rank;
   });
-  // time input only makes sense in auto (완료 시간 기준) mode — manual mode's
-  // order is fixed by drag/dropdown rank, not by a recorded time.
-  const showTimeInput = editable && day3.mode !== "manual";
+  const turnOrder = turnOrderOf(day3);
+  const showTimeInput = editable;
   return /*#__PURE__*/React.createElement("div", {
     className: "ranking-list"
   }, ranked.map((e, idx) => {
@@ -1473,7 +1473,10 @@ function RankingBoard({
       key: e.teamId
     }, /*#__PURE__*/React.createElement("div", {
       className: "rank-num"
-    }, e.rank || "-"), /*#__PURE__*/React.createElement(TeamChip, {
+    }, e.rank || "-"), /*#__PURE__*/React.createElement("span", {
+      className: "turn-badge",
+      title: "\uC9C4\uD589\uC21C\uC11C"
+    }, turnOrder[e.teamId], "\uBC88\uC9F8 \uC9C4\uD589"), /*#__PURE__*/React.createElement(TeamChip, {
       team: t,
       exec: execTeamIds && execTeamIds.includes(e.teamId),
       champion: e.rank === 1
@@ -1855,22 +1858,19 @@ function DayTab({
     })));
   }
 
-  // day3 ranking editor
+  // day3 ranking editor — 진행순서(줄 세우는 순서)는 완전히 별개 개념이라
+  // 시간과 무관하게 관리자가 직접 정하고, 순위는 항상 완료 시간으로만 계산된다.
   const execTeamIds = state.scoring[dayKey].execTeams;
   const entries = dayState.entries;
-  const toggleMode = mode => update(s => {
-    s.days.day3.mode = mode;
-    return s;
-  });
   const setTime = (teamId, val) => update(s => {
     const e = s.days.day3.entries.find(x => x.teamId === teamId);
     e.timeSec = parseTimeInput(val);
     return s;
   });
-  const setRank = (teamId, newRank) => update(s => {
+  const setTurnOrder = (teamId, newOrder) => update(s => {
     const arr = s.days.day3.entries;
     const idx = arr.findIndex(x => x.teamId === teamId);
-    const newIdx = Math.max(0, Math.min(arr.length - 1, newRank - 1));
+    const newIdx = Math.max(0, Math.min(arr.length - 1, newOrder - 1));
     if (idx < 0 || idx === newIdx) return null;
     const [item] = arr.splice(idx, 1);
     arr.splice(newIdx, 0, item);
@@ -1878,6 +1878,7 @@ function DayTab({
   });
   const ranked = getRankedEntries(dayState);
   const rankOf = Object.fromEntries(ranked.map(e => [e.teamId, e.rank]));
+  const turnOrder = turnOrderOf(dayState);
   return /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1886,19 +1887,14 @@ function DayTab({
     className: "title"
   }, info.label, " \xB7 ", info.game), /*#__PURE__*/React.createElement("div", {
     className: "sub"
-  }, info.date, " \xB7 ", info.place, " \xB7 ", info.unit)), /*#__PURE__*/React.createElement("div", {
+  }, info.date, " \xB7 ", info.place, " \xB7 ", info.unit)), /*#__PURE__*/React.createElement("p", {
     style: {
-      marginBottom: 12,
-      display: "flex",
-      gap: 8
+      color: "var(--sub)",
+      fontSize: 12,
+      marginTop: -6,
+      marginBottom: 12
     }
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "small-btn" + (dayState.mode !== "manual" ? " primary" : ""),
-    onClick: () => toggleMode("auto")
-  }, "\uC790\uB3D9 \uC815\uB82C (\uC644\uB8CC \uC2DC\uAC04 \uAE30\uC900)"), /*#__PURE__*/React.createElement("button", {
-    className: "small-btn" + (dayState.mode === "manual" ? " primary" : ""),
-    onClick: () => toggleMode("manual")
-  }, "\uC218\uB3D9 \uC21C\uC11C \uC9C0\uC815")), /*#__PURE__*/React.createElement("div", {
+  }, "\uC9C4\uD589\uC21C\uC11C\uB294 \uD300\uBE4C\uB529 \uCF54\uC2A4\uB97C \uB3C4\uB294 \uC21C\uC11C(\uD604\uC7A5 \uB300\uAE30\uC5F4)\uC774\uACE0, \uC21C\uC704\uB294 \uC644\uB8CC \uC2DC\uAC04\uC73C\uB85C \uC790\uB3D9 \uACC4\uC0B0\uB429\uB2C8\uB2E4 \u2014 \uC11C\uB85C \uC601\uD5A5\uC744 \uC8FC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -1909,7 +1905,16 @@ function DayTab({
     return /*#__PURE__*/React.createElement("div", {
       className: "rank-edit-row",
       key: e.teamId
-    }, /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("select", {
+      value: turnOrder[e.teamId],
+      style: {
+        width: 90
+      },
+      onChange: ev => setTurnOrder(e.teamId, parseInt(ev.target.value, 10))
+    }, entries.map((_, i) => /*#__PURE__*/React.createElement("option", {
+      key: i,
+      value: i + 1
+    }, i + 1, "\uBC88\uC9F8"))), /*#__PURE__*/React.createElement("div", {
       style: {
         width: 30,
         textAlign: "center",
@@ -1920,7 +1925,7 @@ function DayTab({
       team: t,
       exec: execTeamIds.includes(e.teamId),
       champion: rankOf[e.teamId] === 1
-    }), dayState.mode !== "manual" ? /*#__PURE__*/React.createElement("input", {
+    }), /*#__PURE__*/React.createElement("input", {
       type: "text",
       style: {
         marginLeft: "auto",
@@ -1929,17 +1934,7 @@ function DayTab({
       placeholder: "mm:ss",
       defaultValue: e.timeSec != null ? fmtTime(e.timeSec) : "",
       onBlur: ev => setTime(e.teamId, ev.target.value)
-    }) : /*#__PURE__*/React.createElement("select", {
-      style: {
-        marginLeft: "auto",
-        width: 80
-      },
-      value: rankOf[e.teamId] || idx + 1,
-      onChange: ev => setRank(e.teamId, parseInt(ev.target.value, 10))
-    }, entries.map((_, i) => /*#__PURE__*/React.createElement("option", {
-      key: i,
-      value: i + 1
-    }, i + 1, "\uC704"))));
+    }));
   })));
 }
 
