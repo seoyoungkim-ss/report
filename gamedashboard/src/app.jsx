@@ -413,15 +413,20 @@ function compressImage(file, maxDim, quality){
 function isValidBracket(bracket){
   return !!(bracket && bracket.nodes && bracket.rootId && bracket.nodes[bracket.rootId]);
 }
+/* Same shape check used both when loading from localStorage on boot and
+   when a backup file is restored — either can carry a state shape this
+   build no longer understands. */
+function isValidState(parsed){
+  const days = parsed && parsed.days;
+  return !!(days && DAYS.every(d=>
+    d.format!=="bracket" || isValidBracket(days[d.key] && days[d.key].bracket)));
+}
 function loadInitialState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      const days = parsed && parsed.days;
-      const bracketDaysOk = days && DAYS.every(d=>
-        d.format!=="bracket" || isValidBracket(days[d.key] && days[d.key].bracket));
-      if(bracketDaysOk) return parsed;
+      if(isValidState(parsed)) return parsed;
     }
   }catch(e){ /* corrupt or unavailable — fall back to defaults */ }
   return createDefaultState();
@@ -1130,6 +1135,41 @@ function ControlTab({ state, update }){
       window.alert("엑셀 생성에 실패했습니다: " + (e && e.message ? e.message : e));
     }
   };
+  const downloadBackup = ()=>{
+    try{
+      const text = JSON.stringify(state, null, 2);
+      const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,"-");
+      a.download = `썸머탈출페스티벌_백업_${stamp}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }catch(e){
+      window.alert("백업 생성에 실패했습니다: " + (e && e.message ? e.message : e));
+    }
+  };
+  const restoreBackup = (file)=>{
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(!isValidState(parsed)){
+          window.alert("올바른 백업 파일이 아닙니다.");
+          return;
+        }
+        if(!window.confirm("지금 저장된 모든 데이터를 이 백업 파일 내용으로 덮어씁니다. 계속할까요?")) return;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        window.location.reload();
+      }catch(e){
+        window.alert("백업 파일을 읽을 수 없습니다: " + (e && e.message ? e.message : e));
+      }
+    };
+    reader.onerror = ()=> window.alert("파일을 읽는 데 실패했습니다.");
+    reader.readAsText(file);
+  };
   const activeDay = dayInfo(state.display.activeDayKey);
   const exportDayExcel = ()=>{
     try{
@@ -1182,6 +1222,20 @@ function ControlTab({ state, update }){
         <button className="small-btn" onClick={exportExcel}>
           📊 최종 결과 엑셀 다운로드
         </button>
+      </div>
+      <div style={{marginTop:18,paddingTop:16,borderTop:"1px dashed var(--line)"}}>
+        <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
+          지금까지 입력한 모든 데이터(팀 정보·대진표·순위·배점 설정 등)를 파일로 백업해두세요.
+          브라우저 데이터가 지워지거나 다른 노트북으로 옮겨야 할 때 이 파일로 그대로 복원할 수 있습니다.
+        </p>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <button className="small-btn" onClick={downloadBackup}>💾 전체 백업 다운로드 (.json)</button>
+          <label className="small-btn" style={{cursor:"pointer"}}>
+            📂 백업 파일 불러오기
+            <input type="file" accept=".json,application/json" style={{display:"none"}}
+              onChange={(e)=>{ restoreBackup(e.target.files[0]); e.target.value=""; }} />
+          </label>
+        </div>
       </div>
       <div style={{marginTop:18,paddingTop:16,borderTop:"1px dashed var(--line)"}}>
         <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>

@@ -1069,14 +1069,19 @@ function compressImage(file, maxDim, quality) {
 function isValidBracket(bracket) {
   return !!(bracket && bracket.nodes && bracket.rootId && bracket.nodes[bracket.rootId]);
 }
+/* Same shape check used both when loading from localStorage on boot and
+   when a backup file is restored — either can carry a state shape this
+   build no longer understands. */
+function isValidState(parsed) {
+  const days = parsed && parsed.days;
+  return !!(days && DAYS.every(d => d.format !== "bracket" || isValidBracket(days[d.key] && days[d.key].bracket)));
+}
 function loadInitialState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      const days = parsed && parsed.days;
-      const bracketDaysOk = days && DAYS.every(d => d.format !== "bracket" || isValidBracket(days[d.key] && days[d.key].bracket));
-      if (bracketDaysOk) return parsed;
+      if (isValidState(parsed)) return parsed;
     }
   } catch (e) {/* corrupt or unavailable — fall back to defaults */}
   return createDefaultState();
@@ -2159,6 +2164,43 @@ function ControlTab({
       window.alert("엑셀 생성에 실패했습니다: " + (e && e.message ? e.message : e));
     }
   };
+  const downloadBackup = () => {
+    try {
+      const text = JSON.stringify(state, null, 2);
+      const blob = new Blob([text], {
+        type: "application/json;charset=utf-8"
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+      a.download = `썸머탈출페스티벌_백업_${stamp}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      window.alert("백업 생성에 실패했습니다: " + (e && e.message ? e.message : e));
+    }
+  };
+  const restoreBackup = file => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!isValidState(parsed)) {
+          window.alert("올바른 백업 파일이 아닙니다.");
+          return;
+        }
+        if (!window.confirm("지금 저장된 모든 데이터를 이 백업 파일 내용으로 덮어씁니다. 계속할까요?")) return;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        window.location.reload();
+      } catch (e) {
+        window.alert("백업 파일을 읽을 수 없습니다: " + (e && e.message ? e.message : e));
+      }
+    };
+    reader.onerror = () => window.alert("파일을 읽는 데 실패했습니다.");
+    reader.readAsText(file);
+  };
   const activeDay = dayInfo(state.display.activeDayKey);
   const exportDayExcel = () => {
     try {
@@ -2242,6 +2284,43 @@ function ControlTab({
     className: "small-btn",
     onClick: exportExcel
   }, "\uD83D\uDCCA \uCD5C\uC885 \uACB0\uACFC \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 18,
+      paddingTop: 16,
+      borderTop: "1px dashed var(--line)"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "var(--sub)",
+      fontSize: 12,
+      marginBottom: 8
+    }
+  }, "\uC9C0\uAE08\uAE4C\uC9C0 \uC785\uB825\uD55C \uBAA8\uB4E0 \uB370\uC774\uD130(\uD300 \uC815\uBCF4\xB7\uB300\uC9C4\uD45C\xB7\uC21C\uC704\xB7\uBC30\uC810 \uC124\uC815 \uB4F1)\uB97C \uD30C\uC77C\uB85C \uBC31\uC5C5\uD574\uB450\uC138\uC694. \uBE0C\uB77C\uC6B0\uC800 \uB370\uC774\uD130\uAC00 \uC9C0\uC6CC\uC9C0\uAC70\uB098 \uB2E4\uB978 \uB178\uD2B8\uBD81\uC73C\uB85C \uC62E\uACA8\uC57C \uD560 \uB54C \uC774 \uD30C\uC77C\uB85C \uADF8\uB300\uB85C \uBCF5\uC6D0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "small-btn",
+    onClick: downloadBackup
+  }, "\uD83D\uDCBE \uC804\uCCB4 \uBC31\uC5C5 \uB2E4\uC6B4\uB85C\uB4DC (.json)"), /*#__PURE__*/React.createElement("label", {
+    className: "small-btn",
+    style: {
+      cursor: "pointer"
+    }
+  }, "\uD83D\uDCC2 \uBC31\uC5C5 \uD30C\uC77C \uBD88\uB7EC\uC624\uAE30", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".json,application/json",
+    style: {
+      display: "none"
+    },
+    onChange: e => {
+      restoreBackup(e.target.files[0]);
+      e.target.value = "";
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18,
       paddingTop: 16,
