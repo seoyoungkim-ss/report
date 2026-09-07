@@ -91,7 +91,9 @@ input,select{font-family:inherit;}
 .round-label{text-align:center;color:var(--sub);font-size:18px;font-weight:800;letter-spacing:2px;align-self:end;text-transform:uppercase;transition:all .25s;}
 /* the round currently being played — called out so it's obvious at a
    glance which matches are live right now */
-.round-label.round-current{color:var(--gold);font-size:21px;text-shadow:0 0 14px rgba(255,209,102,.65);}
+/* color/glow only, no font-size change — a size bump here would nudge every
+   row below it (down to round 1) each time "current" moves to a new round */
+.round-label.round-current{color:var(--gold);text-shadow:0 0 14px rgba(255,209,102,.65);}
 .match{width:260px;justify-self:center;align-self:start;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
   border-radius:12px;padding:8px;margin:0;position:relative;transition:all .25s;}
 .match.decided{border-color:var(--cyan);box-shadow:0 0 18px rgba(38,224,217,.35);}
@@ -104,6 +106,7 @@ input,select{font-family:inherit;}
 .slot.loser{opacity:.5;text-decoration:line-through;}
 .slot-btn{all:unset;display:flex;align-items:center;gap:8px;width:100%;cursor:pointer;border-radius:8px;padding:5px 9px;}
 .slot-btn:hover{background:rgba(255,255,255,.06);}
+.slot-btn:disabled{cursor:default;pointer-events:none;}
 .match-meta{margin-top:4px;font-size:11px;color:var(--sub);padding:0 4px;}
 .match-meta b{color:var(--orange2);}
 svg.connectors{position:absolute;inset:0;pointer-events:none;overflow:visible;}
@@ -182,6 +185,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
    they render inline on every real match, admin and display screen alike */
 .mini-widget{margin-top:3px;background:#081a34;border:1px dashed var(--line);border-radius:7px;padding:3px 4px;}
 .mini-widget-row{display:flex;align-items:center;gap:3px;}
+.mini-pick:disabled,.mini-stepper-btn:disabled{opacity:.35;cursor:default;}
 .mini-label{font-size:9px;color:var(--sub);font-weight:700;flex:none;}
 .mini-pick{flex:1;min-width:0;padding:3px 2px;font-size:10px;border-radius:5px;border:1px solid var(--line);
   background:#0d2140;color:var(--text);font-weight:700;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -1424,11 +1428,12 @@ function BracketBoard({
       className: "match-reset-btn",
       onClick: resetWinner,
       title: "\uC2B9\uC790 \uCD08\uAE30\uD654"
-    }, "\u21BA"), canPick ? /*#__PURE__*/React.createElement("button", {
+    }, "\u21BA"), /*#__PURE__*/React.createElement("button", {
       className: "slot-btn",
+      disabled: !canPick,
       onClick: () => pick(aId)
     }, /*#__PURE__*/React.createElement("span", {
-      className: rowClass(aId),
+      className: rowClass(aId) + (!aTeam ? " tbd" : ""),
       style: {
         width: "100%"
       }
@@ -1436,17 +1441,12 @@ function BracketBoard({
       team: aTeam,
       exec: isExec(aId),
       champion: isChampion(aId)
-    }))) : /*#__PURE__*/React.createElement("div", {
-      className: rowClass(aId) + (!aTeam ? " tbd" : "")
-    }, /*#__PURE__*/React.createElement(TeamChip, {
-      team: aTeam,
-      exec: isExec(aId),
-      champion: isChampion(aId)
-    })), canPick ? /*#__PURE__*/React.createElement("button", {
+    }))), /*#__PURE__*/React.createElement("button", {
       className: "slot-btn",
+      disabled: !canPick,
       onClick: () => pick(bId)
     }, /*#__PURE__*/React.createElement("span", {
-      className: rowClass(bId),
+      className: rowClass(bId) + (!bTeam ? " tbd" : ""),
       style: {
         width: "100%"
       }
@@ -1454,13 +1454,7 @@ function BracketBoard({
       team: bTeam,
       exec: isExec(bId),
       champion: isChampion(bId)
-    }))) : /*#__PURE__*/React.createElement("div", {
-      className: rowClass(bId) + (!bTeam ? " tbd" : "")
-    }, /*#__PURE__*/React.createElement(TeamChip, {
-      team: bTeam,
-      exec: isExec(bId),
-      champion: isChampion(bId)
-    })), renderExtra && aTeam && bTeam && renderExtra(m, id));
+    }))), renderExtra && renderExtra(m, id));
   })));
 }
 
@@ -1631,10 +1625,14 @@ function FirstMoverPicker({
   bId
 }) {
   const current = match.meta && match.meta.firstMoverId;
-  const pick = teamId => onUpdate({
-    firstMoverId: teamId,
-    firstMoverLabel: "선공"
-  });
+  const ready = !!(aId && bId);
+  const pick = teamId => {
+    if (!ready) return;
+    onUpdate({
+      firstMoverId: teamId,
+      firstMoverLabel: "선공"
+    });
+  };
   return /*#__PURE__*/React.createElement("div", {
     className: "mini-widget",
     onClick: e => e.stopPropagation()
@@ -1644,11 +1642,13 @@ function FirstMoverPicker({
     className: "mini-label"
   }, "\uC120\uACF5"), /*#__PURE__*/React.createElement("button", {
     className: "mini-pick" + (current === aId ? " active" : ""),
+    disabled: !ready,
     onClick: () => pick(aId)
-  }, teamsById[aId] && teamsById[aId].name), /*#__PURE__*/React.createElement("button", {
+  }, teamsById[aId] && teamsById[aId].name || " "), /*#__PURE__*/React.createElement("button", {
     className: "mini-pick" + (current === bId ? " active" : ""),
+    disabled: !ready,
     onClick: () => pick(bId)
-  }, teamsById[bId] && teamsById[bId].name), current && /*#__PURE__*/React.createElement("button", {
+  }, teamsById[bId] && teamsById[bId].name || " "), current && /*#__PURE__*/React.createElement("button", {
     className: "mini-reset",
     title: "\uC120\uACF5 \uCD08\uAE30\uD654",
     onClick: () => {
@@ -1669,7 +1669,9 @@ function SetScorePicker({
 }) {
   const setA = match.meta && match.meta.setA || 0;
   const setB = match.meta && match.meta.setB || 0;
+  const ready = !!(aId && bId);
   const bump = (side, delta) => {
+    if (!ready) return;
     let a = setA,
       b = setB;
     if (side === "A") a = Math.max(0, Math.min(2, a + delta));else b = Math.max(0, Math.min(2, b + delta));
@@ -1689,21 +1691,25 @@ function SetScorePicker({
     className: "mini-label"
   }, "\uC138\uD2B8"), /*#__PURE__*/React.createElement("button", {
     className: "mini-stepper-btn",
+    disabled: !ready,
     onClick: () => bump("A", -1)
   }, "\uFF0D"), /*#__PURE__*/React.createElement("span", {
     className: "mini-num"
   }, setA), /*#__PURE__*/React.createElement("button", {
     className: "mini-stepper-btn",
+    disabled: !ready,
     onClick: () => bump("A", 1)
   }, "\uFF0B"), /*#__PURE__*/React.createElement("span", {
     className: "mini-colon"
   }, ":"), /*#__PURE__*/React.createElement("button", {
     className: "mini-stepper-btn",
+    disabled: !ready,
     onClick: () => bump("B", -1)
   }, "\uFF0D"), /*#__PURE__*/React.createElement("span", {
     className: "mini-num"
   }, setB), /*#__PURE__*/React.createElement("button", {
     className: "mini-stepper-btn",
+    disabled: !ready,
     onClick: () => bump("B", 1)
   }, "\uFF0B"), (setA > 0 || setB > 0) && /*#__PURE__*/React.createElement("button", {
     className: "mini-reset",

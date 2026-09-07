@@ -634,21 +634,16 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
               key={id} ref={setRef(id)} style={{ gridColumn:`${minL+1} / ${maxL+2}`, gridRow }}>
               {canReset &&
                 <button className="match-reset-btn" onClick={resetWinner} title="승자 초기화">↺</button>}
-              {canPick ? (
-                <button className="slot-btn" onClick={()=>pick(aId)}>
-                  <span className={rowClass(aId)} style={{width:"100%"}}><TeamChip team={aTeam} exec={isExec(aId)} champion={isChampion(aId)} /></span>
-                </button>
-              ) : (
-                <div className={rowClass(aId) + (!aTeam?" tbd":"")}><TeamChip team={aTeam} exec={isExec(aId)} champion={isChampion(aId)} /></div>
-              )}
-              {canPick ? (
-                <button className="slot-btn" onClick={()=>pick(bId)}>
-                  <span className={rowClass(bId)} style={{width:"100%"}}><TeamChip team={bTeam} exec={isExec(bId)} champion={isChampion(bId)} /></span>
-                </button>
-              ) : (
-                <div className={rowClass(bId) + (!bTeam?" tbd":"")}><TeamChip team={bTeam} exec={isExec(bId)} champion={isChampion(bId)} /></div>
-              )}
-              {renderExtra && aTeam && bTeam && renderExtra(m, id)}
+              {/* always a button (disabled when not yet pickable) rather than swapping
+                  to a plain div — a different element/nesting per state was rendering
+                  at a different height, which shifted every round below it */}
+              <button className="slot-btn" disabled={!canPick} onClick={()=>pick(aId)}>
+                <span className={rowClass(aId) + (!aTeam?" tbd":"")} style={{width:"100%"}}><TeamChip team={aTeam} exec={isExec(aId)} champion={isChampion(aId)} /></span>
+              </button>
+              <button className="slot-btn" disabled={!canPick} onClick={()=>pick(bId)}>
+                <span className={rowClass(bId) + (!bTeam?" tbd":"")} style={{width:"100%"}}><TeamChip team={bTeam} exec={isExec(bId)} champion={isChampion(bId)} /></span>
+              </button>
+              {renderExtra && renderExtra(m, id)}
             </div>
           );
         })}
@@ -766,16 +761,17 @@ function DisplayView({ state, update }){
 /* Admin just picks who goes first directly — the timer itself is run outside the app. */
 function FirstMoverPicker({ match, onUpdate, onReset, teamsById, aId, bId }){
   const current = match.meta && match.meta.firstMoverId;
-  const pick = (teamId)=> onUpdate({ firstMoverId: teamId, firstMoverLabel: "선공" });
+  const ready = !!(aId && bId);
+  const pick = (teamId)=>{ if(!ready) return; onUpdate({ firstMoverId: teamId, firstMoverLabel: "선공" }); };
   return (
     <div className="mini-widget" onClick={e=>e.stopPropagation()}>
       <div className="mini-widget-row">
         <span className="mini-label">선공</span>
-        <button className={"mini-pick" + (current===aId?" active":"")} onClick={()=>pick(aId)}>
-          {teamsById[aId] && teamsById[aId].name}
+        <button className={"mini-pick" + (current===aId?" active":"")} disabled={!ready} onClick={()=>pick(aId)}>
+          {(teamsById[aId] && teamsById[aId].name) || " "}
         </button>
-        <button className={"mini-pick" + (current===bId?" active":"")} onClick={()=>pick(bId)}>
-          {teamsById[bId] && teamsById[bId].name}
+        <button className={"mini-pick" + (current===bId?" active":"")} disabled={!ready} onClick={()=>pick(bId)}>
+          {(teamsById[bId] && teamsById[bId].name) || " "}
         </button>
         {current &&
           <button className="mini-reset" title="선공 초기화" onClick={()=>{ if(window.confirm("선공 기록을 초기화할까요?")) onReset(); }}>↺</button>}
@@ -789,7 +785,9 @@ function FirstMoverPicker({ match, onUpdate, onReset, teamsById, aId, bId }){
 function SetScorePicker({ match, onUpdate, onWinner, onReset, aId, bId }){
   const setA = (match.meta && match.meta.setA) || 0;
   const setB = (match.meta && match.meta.setB) || 0;
+  const ready = !!(aId && bId);
   const bump = (side, delta)=>{
+    if(!ready) return;
     let a = setA, b = setB;
     if(side==="A") a = Math.max(0, Math.min(2, a+delta));
     else b = Math.max(0, Math.min(2, b+delta));
@@ -801,13 +799,13 @@ function SetScorePicker({ match, onUpdate, onWinner, onReset, aId, bId }){
     <div className="mini-widget" onClick={e=>e.stopPropagation()}>
       <div className="mini-widget-row">
         <span className="mini-label">세트</span>
-        <button className="mini-stepper-btn" onClick={()=>bump("A",-1)}>－</button>
+        <button className="mini-stepper-btn" disabled={!ready} onClick={()=>bump("A",-1)}>－</button>
         <span className="mini-num">{setA}</span>
-        <button className="mini-stepper-btn" onClick={()=>bump("A",1)}>＋</button>
+        <button className="mini-stepper-btn" disabled={!ready} onClick={()=>bump("A",1)}>＋</button>
         <span className="mini-colon">:</span>
-        <button className="mini-stepper-btn" onClick={()=>bump("B",-1)}>－</button>
+        <button className="mini-stepper-btn" disabled={!ready} onClick={()=>bump("B",-1)}>－</button>
         <span className="mini-num">{setB}</span>
-        <button className="mini-stepper-btn" onClick={()=>bump("B",1)}>＋</button>
+        <button className="mini-stepper-btn" disabled={!ready} onClick={()=>bump("B",1)}>＋</button>
         {(setA>0 || setB>0) &&
           <button className="mini-reset" title="점수 초기화" onClick={()=>{ if(window.confirm("세트 스코어를 초기화할까요? (승자는 별도로 초기화해야 합니다)")) onReset(); }}>↺</button>}
       </div>

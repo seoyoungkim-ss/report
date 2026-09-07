@@ -83,7 +83,9 @@ input,select{font-family:inherit;}
 .round-label{text-align:center;color:var(--sub);font-size:18px;font-weight:800;letter-spacing:2px;align-self:end;text-transform:uppercase;transition:all .25s;}
 /* the round currently being played — called out so it's obvious at a
    glance which matches are live right now */
-.round-label.round-current{color:var(--gold);font-size:21px;text-shadow:0 0 14px rgba(255,209,102,.65);}
+/* color/glow only, no font-size change — a size bump here would nudge every
+   row below it (down to round 1) each time "current" moves to a new round */
+.round-label.round-current{color:var(--gold);text-shadow:0 0 14px rgba(255,209,102,.65);}
 .match{width:260px;justify-self:center;align-self:start;background:linear-gradient(180deg,var(--panel),var(--panel2));border:2px solid var(--line);
   border-radius:12px;padding:8px;margin:0;position:relative;transition:all .25s;}
 .match.decided{border-color:var(--cyan);box-shadow:0 0 18px rgba(38,224,217,.35);}
@@ -96,6 +98,7 @@ input,select{font-family:inherit;}
 .slot.loser{opacity:.5;text-decoration:line-through;}
 .slot-btn{all:unset;display:flex;align-items:center;gap:8px;width:100%;cursor:pointer;border-radius:8px;padding:5px 9px;}
 .slot-btn:hover{background:rgba(255,255,255,.06);}
+.slot-btn:disabled{cursor:default;pointer-events:none;}
 .match-meta{margin-top:4px;font-size:11px;color:var(--sub);padding:0 4px;}
 .match-meta b{color:var(--orange2);}
 svg.connectors{position:absolute;inset:0;pointer-events:none;overflow:visible;}
@@ -174,6 +177,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
    they render inline on every real match, admin and display screen alike */
 .mini-widget{margin-top:3px;background:#081a34;border:1px dashed var(--line);border-radius:7px;padding:3px 4px;}
 .mini-widget-row{display:flex;align-items:center;gap:3px;}
+.mini-pick:disabled,.mini-stepper-btn:disabled{opacity:.35;cursor:default;}
 .mini-label{font-size:9px;color:var(--sub);font-weight:700;flex:none;}
 .mini-pick{flex:1;min-width:0;padding:3px 2px;font-size:10px;border-radius:5px;border:1px solid var(--line);
   background:#0d2140;color:var(--text);font-weight:700;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
