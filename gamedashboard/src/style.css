@@ -6,13 +6,19 @@
   --sky1:#1f7fe0; --sky2:#2f97ee; --sky3:#6fc6f7; --wave:#eaf7ff;
 }
 *{box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);}
+body{margin:0;background:var(--bg);color:var(--text);}
 .app{min-height:100vh;background:
   radial-gradient(650px 650px at 90% -8%, rgba(255,217,61,.55) 0%, rgba(255,217,61,0) 60%),
   linear-gradient(180deg, var(--sky1) 0%, var(--sky2) 45%, var(--sky3) 100%);
   font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
   padding:0;position:relative;overflow-x:hidden;}
 .app-content{position:relative;z-index:1;}
+/* auto-fit stage for the TV/display screen: the stage is sized to its
+   content's natural (fixed-px) size, then scaled as one unit to fill
+   whatever the real screen turns out to be (laptop or TV, any aspect
+   ratio) — see useFitScale(). Admin mode never uses this. */
+.tv-viewport{width:100%;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.tv-stage{position:relative;width:max-content;transform-origin:center center;}
 /* decorative summer-festival backdrop — purely visual, sits behind the cards */
 .fest-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
 .fest-sun{position:absolute;top:-46px;right:36px;font-size:150px;line-height:1;

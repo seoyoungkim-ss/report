@@ -14,13 +14,19 @@
   --sky1:#1f7fe0; --sky2:#2f97ee; --sky3:#6fc6f7; --wave:#eaf7ff;
 }
 *{box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);}
+body{margin:0;background:var(--bg);color:var(--text);}
 .app{min-height:100vh;background:
   radial-gradient(650px 650px at 90% -8%, rgba(255,217,61,.55) 0%, rgba(255,217,61,0) 60%),
   linear-gradient(180deg, var(--sky1) 0%, var(--sky2) 45%, var(--sky3) 100%);
   font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
   padding:0;position:relative;overflow-x:hidden;}
 .app-content{position:relative;z-index:1;}
+/* auto-fit stage for the TV/display screen: the stage is sized to its
+   content's natural (fixed-px) size, then scaled as one unit to fill
+   whatever the real screen turns out to be (laptop or TV, any aspect
+   ratio) — see useFitScale(). Admin mode never uses this. */
+.tv-viewport{width:100%;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.tv-stage{position:relative;width:max-content;transform-origin:center center;}
 /* decorative summer-festival backdrop — purely visual, sits behind the cards */
 .fest-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
 .fest-sun{position:absolute;top:-46px;right:36px;font-size:150px;line-height:1;
@@ -1298,6 +1304,11 @@ function BracketBoard({
     const cont = containerRef.current;
     if (!cont) return;
     const cRect = cont.getBoundingClientRect();
+    // getBoundingClientRect() reflects any ancestor CSS transform:scale()
+    // (e.g. the TV auto-fit stage) — divide it back out so these become
+    // local SVG-space coordinates; otherwise the ancestor's scale would
+    // apply to the lines a second time when the SVG itself is rendered.
+    const ambientScale = cont.offsetWidth ? cRect.width / cont.offsetWidth : 1;
     const newLines = [];
     matchIds.forEach(id => {
       const node = bracket.nodes[id];
@@ -1311,10 +1322,10 @@ function BracketBoard({
       // branch shorter than its sibling): line exits the top of the
       // source box and enters the bottom of the parent's box.
       newLines.push({
-        x1: sr.left + sr.width / 2 - cRect.left,
-        y1: sr.top - cRect.top,
-        x2: tr.left + tr.width / 2 - cRect.left,
-        y2: tr.bottom - cRect.top,
+        x1: (sr.left + sr.width / 2 - cRect.left) / ambientScale,
+        y1: (sr.top - cRect.top) / ambientScale,
+        x2: (tr.left + tr.width / 2 - cRect.left) / ambientScale,
+        y2: (tr.bottom - cRect.top) / ambientScale,
         decided: !!node.winnerId
       });
     });
@@ -2431,6 +2442,40 @@ function AdminView({
 }
 
 /* ============================== app root ============================== */
+/* Measures the display stage's natural (unscaled) size and the real
+   viewport it sits in, then returns the scale factor that makes the
+   stage fill the viewport exactly — so the TV screen always shows the
+   whole composition regardless of its actual resolution/aspect ratio,
+   instead of a fixed-px layout leaving blank margin or overflowing. */
+function useFitScale(stageRef, viewportRef) {
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const stage = stageRef.current,
+      vp = viewportRef.current;
+    if (!stage || !vp) return;
+    const recompute = () => {
+      const naturalW = stage.offsetWidth,
+        naturalH = stage.offsetHeight;
+      const vw = vp.clientWidth,
+        vh = vp.clientHeight;
+      if (!naturalW || !naturalH || !vw || !vh) return;
+      setScale(Math.min(vw / naturalW, vh / naturalH));
+    };
+    recompute();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(recompute);
+    const safetyTimer = setTimeout(recompute, 400);
+    window.addEventListener("resize", recompute);
+    const ro = new ResizeObserver(recompute);
+    ro.observe(stage);
+    ro.observe(vp);
+    return () => {
+      window.removeEventListener("resize", recompute);
+      ro.disconnect();
+      clearTimeout(safetyTimer);
+    };
+  }, []);
+  return scale;
+}
 function App() {
   const {
     state,
@@ -2444,6 +2489,9 @@ function App() {
       return "display";
     }
   });
+  const stageRef = useRef(null);
+  const viewportRef = useRef(null);
+  const scale = useFitScale(stageRef, viewportRef);
   const heroGames = mode === "display" && state ? DAY_ILLUSTRATIONS[state.display.activeDayKey] || [] : [];
   // bracket days now use the full canvas bottom-to-top, so the illustration
   // moves up beside the final-round box (a narrower gap) instead of sitting
@@ -2465,7 +2513,30 @@ function App() {
     className: "fest-palm fest-palm-l"
   }, "\uD83C\uDF34"), /*#__PURE__*/React.createElement("span", {
     className: "fest-palm fest-palm-r"
-  }, "\uD83C\uDF34"), heroGames.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83C\uDF34"), /*#__PURE__*/React.createElement("svg", {
+    className: "fest-wave",
+    viewBox: "0 0 1440 120",
+    preserveAspectRatio: "none"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M0,45 C240,95 480,5 720,45 C960,85 1200,15 1440,55 L1440,120 L0,120 Z",
+    fill: "rgba(234,247,255,0.55)"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M0,75 C240,115 480,45 720,75 C960,105 1200,55 1440,85 L1440,120 L0,120 Z",
+    fill: "rgba(234,247,255,0.9)"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "app-content"
+  }, saveError && /*#__PURE__*/React.createElement("div", {
+    className: "banner"
+  }, "\u26A0\uFE0F ", saveError), mode === "display" ? /*#__PURE__*/React.createElement("div", {
+    className: "tv-viewport",
+    ref: viewportRef
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "tv-stage",
+    ref: stageRef,
+    style: {
+      transform: `scale(${scale})`
+    }
+  }, heroGames.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "fest-hero fest-hero-" + heroPos
   }, heroGames.map((g, i) => {
     const Illust = ILLUSTRATIONS[g.id];
@@ -2494,24 +2565,10 @@ function App() {
     }, /*#__PURE__*/React.createElement(Illust, {
       size: heroSize
     }));
-  })), /*#__PURE__*/React.createElement("svg", {
-    className: "fest-wave",
-    viewBox: "0 0 1440 120",
-    preserveAspectRatio: "none"
-  }, /*#__PURE__*/React.createElement("path", {
-    d: "M0,45 C240,95 480,5 720,45 C960,85 1200,15 1440,55 L1440,120 L0,120 Z",
-    fill: "rgba(234,247,255,0.55)"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M0,75 C240,115 480,45 720,75 C960,105 1200,55 1440,85 L1440,120 L0,120 Z",
-    fill: "rgba(234,247,255,0.9)"
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "app-content"
-  }, saveError && /*#__PURE__*/React.createElement("div", {
-    className: "banner"
-  }, "\u26A0\uFE0F ", saveError), mode === "display" ? /*#__PURE__*/React.createElement(DisplayView, {
+  })), /*#__PURE__*/React.createElement(DisplayView, {
     state: state,
     update: update
-  }) : /*#__PURE__*/React.createElement(AdminView, {
+  }))) : /*#__PURE__*/React.createElement(AdminView, {
     state: state,
     update: update
   }), /*#__PURE__*/React.createElement("button", {

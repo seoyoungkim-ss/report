@@ -539,6 +539,11 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
     const cont = containerRef.current;
     if(!cont) return;
     const cRect = cont.getBoundingClientRect();
+    // getBoundingClientRect() reflects any ancestor CSS transform:scale()
+    // (e.g. the TV auto-fit stage) — divide it back out so these become
+    // local SVG-space coordinates; otherwise the ancestor's scale would
+    // apply to the lines a second time when the SVG itself is rendered.
+    const ambientScale = cont.offsetWidth ? (cRect.width / cont.offsetWidth) : 1;
     const newLines = [];
     matchIds.forEach(id=>{
       const node = bracket.nodes[id];
@@ -551,8 +556,8 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
       // branch shorter than its sibling): line exits the top of the
       // source box and enters the bottom of the parent's box.
       newLines.push({
-        x1: sr.left + sr.width/2 - cRect.left, y1: sr.top - cRect.top,
-        x2: tr.left + tr.width/2 - cRect.left, y2: tr.bottom - cRect.top,
+        x1: (sr.left + sr.width/2 - cRect.left) / ambientScale, y1: (sr.top - cRect.top) / ambientScale,
+        x2: (tr.left + tr.width/2 - cRect.left) / ambientScale, y2: (tr.bottom - cRect.top) / ambientScale,
         decided: !!node.winnerId,
       });
     });
@@ -1288,12 +1293,42 @@ function AdminView({ state, update }){
 }
 
 /* ============================== app root ============================== */
+/* Measures the display stage's natural (unscaled) size and the real
+   viewport it sits in, then returns the scale factor that makes the
+   stage fill the viewport exactly — so the TV screen always shows the
+   whole composition regardless of its actual resolution/aspect ratio,
+   instead of a fixed-px layout leaving blank margin or overflowing. */
+function useFitScale(stageRef, viewportRef){
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(()=>{
+    const stage = stageRef.current, vp = viewportRef.current;
+    if(!stage || !vp) return;
+    const recompute = ()=>{
+      const naturalW = stage.offsetWidth, naturalH = stage.offsetHeight;
+      const vw = vp.clientWidth, vh = vp.clientHeight;
+      if(!naturalW || !naturalH || !vw || !vh) return;
+      setScale(Math.min(vw / naturalW, vh / naturalH));
+    };
+    recompute();
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(recompute);
+    const safetyTimer = setTimeout(recompute, 400);
+    window.addEventListener("resize", recompute);
+    const ro = new ResizeObserver(recompute);
+    ro.observe(stage); ro.observe(vp);
+    return ()=>{ window.removeEventListener("resize", recompute); ro.disconnect(); clearTimeout(safetyTimer); };
+  },[]);
+  return scale;
+}
+
 function App(){
   const { state, update, saveError } = useLocalState();
   const [mode, setMode] = useState(()=>{
     try{ return new URLSearchParams(window.location.search).get("admin")==="1" ? "admin" : "display"; }
     catch(e){ return "display"; }
   });
+  const stageRef = useRef(null);
+  const viewportRef = useRef(null);
+  const scale = useFitScale(stageRef, viewportRef);
 
   const heroGames = (mode==="display" && state) ? (DAY_ILLUSTRATIONS[state.display.activeDayKey] || []) : [];
   // bracket days now use the full canvas bottom-to-top, so the illustration
@@ -1311,21 +1346,6 @@ function App(){
         <span className="fest-palm fest-palm-l">🌴</span>
         <span className="fest-palm fest-palm-r">🌴</span>
 
-        {heroGames.length>0 && <div className={"fest-hero fest-hero-" + heroPos}>
-          {heroGames.map((g,i)=>{
-            const Illust = ILLUSTRATIONS[g.id];
-            const layout = heroGames.length>1
-              ? [{ rot:-6, y:22, ml:0 }, { rot:9, y:-30, ml:-heroSize*0.16 }][i]
-              : { rot:-7, y:0, ml:0 };
-            return (
-              <div className="fest-hero-item" key={g.id} title={g.label}
-                style={{transform:`rotate(${layout.rot}deg) translateY(${layout.y}px)`, marginLeft:layout.ml, zIndex:i}}>
-                <Illust size={heroSize} />
-              </div>
-            );
-          })}
-        </div>}
-
         <svg className="fest-wave" viewBox="0 0 1440 120" preserveAspectRatio="none">
           <path d="M0,45 C240,95 480,5 720,45 C960,85 1200,15 1440,55 L1440,120 L0,120 Z" fill="rgba(234,247,255,0.55)"/>
           <path d="M0,75 C240,115 480,45 720,75 C960,105 1200,55 1440,85 L1440,120 L0,120 Z" fill="rgba(234,247,255,0.9)"/>
@@ -1333,7 +1353,27 @@ function App(){
       </div>
       <div className="app-content">
         {saveError && <div className="banner">⚠️ {saveError}</div>}
-        {mode==="display" ? <DisplayView state={state} update={update} /> : <AdminView state={state} update={update} />}
+        {mode==="display" ? (
+          <div className="tv-viewport" ref={viewportRef}>
+            <div className="tv-stage" ref={stageRef} style={{transform:`scale(${scale})`}}>
+              {heroGames.length>0 && <div className={"fest-hero fest-hero-" + heroPos}>
+                {heroGames.map((g,i)=>{
+                  const Illust = ILLUSTRATIONS[g.id];
+                  const layout = heroGames.length>1
+                    ? [{ rot:-6, y:22, ml:0 }, { rot:9, y:-30, ml:-heroSize*0.16 }][i]
+                    : { rot:-7, y:0, ml:0 };
+                  return (
+                    <div className="fest-hero-item" key={g.id} title={g.label}
+                      style={{transform:`rotate(${layout.rot}deg) translateY(${layout.y}px)`, marginLeft:layout.ml, zIndex:i}}>
+                      <Illust size={heroSize} />
+                    </div>
+                  );
+                })}
+              </div>}
+              <DisplayView state={state} update={update} />
+            </div>
+          </div>
+        ) : <AdminView state={state} update={update} />}
         <button className="floating-toggle" onClick={()=>setMode(m=>m==="admin"?"display":"admin")} title="관리자 모드 전환 (여기를 눌러 전환)">
           {mode==="admin" ? "📺" : "⚙️"}
         </button>
