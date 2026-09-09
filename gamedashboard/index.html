@@ -124,21 +124,24 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .rank-row.r1 .rank-num{color:var(--gold);font-size:28px;}
 .turn-badge{font-size:11px;font-weight:700;color:var(--sub);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;flex:none;white-space:nowrap;}
 
-/* ---------- final awards ceremony ---------- */
-.awards-view{display:flex;flex-direction:column;align-items:center;gap:32px;padding:40px 20px;}
-.awards-title{font-size:42px;font-weight:900;color:var(--gold);text-shadow:0 0 20px rgba(255,209,102,.5);}
-.awards-list{display:flex;flex-direction:column;gap:16px;width:100%;max-width:900px;}
-.awards-row{display:flex;align-items:center;gap:20px;padding:18px 28px;border-radius:16px;
-  background:linear-gradient(90deg,var(--panel),var(--panel2));border:2px solid var(--line);}
-.awards-medal{font-size:44px;line-height:1;flex:none;}
-.awards-rank-num{font-size:22px;font-weight:900;color:var(--sub);width:50px;flex:none;}
-.awards-score{margin-left:auto;font-size:32px;font-weight:900;color:var(--gold);flex:none;}
-.awards-row.r1{border-color:var(--gold);box-shadow:0 0 30px rgba(255,209,102,.4);padding:26px 32px;transform:scale(1.05);}
-.awards-row.r1 .awards-medal{font-size:60px;}
-.awards-row.r1 .awards-score{font-size:40px;}
-.awards-row.r2{border-color:#c9d3e0;}
-.awards-row.r3{border-color:#e0a672;}
-.awards-row.r4{border-color:var(--cyan);}
+/* ---------- final awards ceremony (podium) ---------- */
+.awards-podium-wrap{display:flex;flex-direction:column;align-items:center;gap:28px;padding:30px 40px 0;}
+.awards-podium-title{font-size:44px;font-weight:900;color:var(--gold);text-shadow:0 0 20px rgba(255,209,102,.5);}
+.awards-podium{display:flex;align-items:flex-end;justify-content:center;gap:28px;}
+.podium-block{display:flex;flex-direction:column;align-items:center;gap:14px;width:340px;flex:none;}
+.podium-team{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.podium-score{font-size:26px;font-weight:900;color:var(--gold);}
+.podium-pedestal{width:340px;border-radius:18px 18px 4px 4px;display:flex;justify-content:center;padding-top:16px;
+  box-shadow:0 10px 30px rgba(4,20,40,.35);}
+.podium-num{font-weight:900;line-height:1;text-shadow:0 5px 0 rgba(0,0,0,.25);}
+.podium-r1 .podium-pedestal{height:340px;background:linear-gradient(180deg,#ffe08a,#d9a520);}
+.podium-r1 .podium-num{color:#7a4b00;font-size:150px;}
+.podium-r2 .podium-pedestal{height:250px;background:linear-gradient(180deg,#eef2f6,#b9c3cf);}
+.podium-r2 .podium-num{color:#4b5563;font-size:110px;}
+.podium-r3 .podium-pedestal{height:190px;background:linear-gradient(180deg,#f0b27a,#b5652c);}
+.podium-r3 .podium-num{color:#5c2e0e;font-size:100px;}
+.podium-r4 .podium-pedestal{height:130px;background:linear-gradient(180deg,#8fd3e8,#3a8fae);}
+.podium-r4 .podium-num{color:#0c2f3a;font-size:80px;}
 
 /* ---------- day3 live timer (operated directly on the TV screen so
    everyone watching sees the exact start/stop moment) ---------- */
@@ -1614,8 +1617,7 @@ function AwardsCeremonyView({
 }) {
   const overall = useMemo(() => computeOverall(state), [state]);
   const top4 = overall.slice(0, 4);
-  const medal = ["🥇", "🥈", "🥉", "🎖️"];
-  const rankClass = ["r1", "r2", "r3", "r4"];
+  const order = [1, 0, 2, 3]; // drawn left-to-right: 2nd, 1st, 3rd, 4th — classic podium order
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1629,25 +1631,31 @@ function AwardsCeremonyView({
   }, "FINAL"), /*#__PURE__*/React.createElement("span", {
     className: "game"
   }, "\uCD5C\uC885 \uC2DC\uC0C1\uC2DD"))), /*#__PURE__*/React.createElement("div", {
-    className: "awards-view"
+    className: "awards-podium-wrap"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "awards-title"
+    className: "awards-podium-title"
   }, "\uD83C\uDFC6 \uCD5C\uC885 \uC21C\uC704 \uC2DC\uC0C1 \uD83C\uDFC6"), /*#__PURE__*/React.createElement("div", {
-    className: "awards-list"
-  }, top4.map((t, idx) => /*#__PURE__*/React.createElement("div", {
-    className: "awards-row " + rankClass[idx],
-    key: t.id
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "awards-medal"
-  }, medal[idx]), /*#__PURE__*/React.createElement("span", {
-    className: "awards-rank-num"
-  }, idx + 1, "\uC704"), /*#__PURE__*/React.createElement(TeamChip, {
-    team: t,
-    size: idx === 0 ? "big" : undefined,
-    champion: idx === 0
-  }), /*#__PURE__*/React.createElement("span", {
-    className: "awards-score"
-  }, t.total, "\uC810"))))));
+    className: "awards-podium"
+  }, order.map(rankIdx => {
+    const t = top4[rankIdx];
+    if (!t) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "podium-block podium-r" + (rankIdx + 1),
+      key: t.id
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "podium-team"
+    }, /*#__PURE__*/React.createElement(TeamChip, {
+      team: t,
+      size: rankIdx === 0 ? "big" : undefined,
+      champion: rankIdx === 0
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "podium-score"
+    }, t.total, "\uC810")), /*#__PURE__*/React.createElement("div", {
+      className: "podium-pedestal"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "podium-num"
+    }, rankIdx + 1)));
+  }))));
 }
 
 /* ============================== display view ============================== */

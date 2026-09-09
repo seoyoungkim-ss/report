@@ -736,8 +736,7 @@ function Day3TimerBanner({ team, startedAt, stoppedAt, onStart, onEnd, onConfirm
 function AwardsCeremonyView({ state }){
   const overall = useMemo(()=>computeOverall(state),[state]);
   const top4 = overall.slice(0,4);
-  const medal = ["🥇","🥈","🥉","🎖️"];
-  const rankClass = ["r1","r2","r3","r4"];
+  const order = [1,0,2,3]; // drawn left-to-right: 2nd, 1st, 3rd, 4th — classic podium order
   return (
     <div>
       <div className="topbar">
@@ -747,17 +746,22 @@ function AwardsCeremonyView({ state }){
           <span className="game">최종 시상식</span>
         </div>
       </div>
-      <div className="awards-view">
-        <div className="awards-title">🏆 최종 순위 시상 🏆</div>
-        <div className="awards-list">
-          {top4.map((t,idx)=>(
-            <div className={"awards-row " + rankClass[idx]} key={t.id}>
-              <span className="awards-medal">{medal[idx]}</span>
-              <span className="awards-rank-num">{idx+1}위</span>
-              <TeamChip team={t} size={idx===0?"big":undefined} champion={idx===0} />
-              <span className="awards-score">{t.total}점</span>
-            </div>
-          ))}
+      <div className="awards-podium-wrap">
+        <div className="awards-podium-title">🏆 최종 순위 시상 🏆</div>
+        <div className="awards-podium">
+          {order.map(rankIdx=>{
+            const t = top4[rankIdx];
+            if(!t) return null;
+            return (
+              <div className={"podium-block podium-r" + (rankIdx+1)} key={t.id}>
+                <div className="podium-team">
+                  <TeamChip team={t} size={rankIdx===0?"big":undefined} champion={rankIdx===0} />
+                  <div className="podium-score">{t.total}점</div>
+                </div>
+                <div className="podium-pedestal"><span className="podium-num">{rankIdx+1}</span></div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
