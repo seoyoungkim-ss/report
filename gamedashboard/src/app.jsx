@@ -139,7 +139,7 @@ function createDefaultState(){
       day3:{ execTeams:[] },
       day4:{ execTeams:[] },
     },
-    display:{ activeDayKey:"day1", day3Timer:{ teamId:null, startedAt:null } },
+    display:{ activeDayKey:"day1", day3Timer:{ teamId:null, startedAt:null, stoppedAt:null } },
   };
 }
 function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
@@ -701,18 +701,27 @@ function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime, onSta
    on the TV screen instead of the ranking list. Picking a team from the
    list only arms this screen (clock sits at 00:00, not yet running); 시작
    and 종료 are both operated right here so everyone watching sees the exact
-   moment the clock actually starts and stops, not just when a team is picked. */
-function Day3TimerBanner({ team, startedAt, onStart, onEnd }){
-  const running = startedAt!=null;
-  const elapsed = useElapsedSeconds(startedAt);
+   moment the clock actually starts and stops, not just when a team is picked.
+   종료 freezes the clock on the final time rather than saving right away —
+   the record isn't written until 시간 확정 is pressed, so the finished time
+   stays up on screen for everyone to read before the view moves on. */
+function Day3TimerBanner({ team, startedAt, stoppedAt, onStart, onEnd, onConfirm }){
+  const running = startedAt!=null && stoppedAt==null;
+  const finished = stoppedAt!=null;
+  const liveElapsed = useElapsedSeconds(running ? startedAt : null);
+  const displaySec = finished ? (stoppedAt-startedAt)/1000 : (running ? liveElapsed : 0);
   return (
     <div className="day3-timer-banner">
       <TeamChip team={team} size="big" />
-      <div className="day3-timer-clock">{fmtTime(running ? elapsed : 0)}</div>
-      <div className="day3-timer-controls">
-        <button className="timer-start-btn timer-start-btn-big" disabled={running} onClick={onStart}>▶ 시작</button>
-        <button className="timer-stop-btn timer-stop-btn-big" onClick={onEnd}>■ 종료</button>
-      </div>
+      <div className={"day3-timer-clock" + (finished?" finished":"")}>{fmtTime(displaySec)}</div>
+      {finished ? (
+        <button className="timer-confirm-btn" onClick={onConfirm}>✔ 시간 확정</button>
+      ) : (
+        <div className="day3-timer-controls">
+          <button className="timer-start-btn timer-start-btn-big" disabled={startedAt!=null} onClick={onStart}>▶ 시작</button>
+          <button className="timer-stop-btn timer-stop-btn-big" onClick={onEnd}>■ 종료</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -730,27 +739,38 @@ function DisplayView({ state, update }){
     e.timeSec = parseTimeInput(val);
     return s;
   });
-  const day3Timer = state.display.day3Timer || { teamId:null, startedAt:null };
+  const day3Timer = state.display.day3Timer || { teamId:null, startedAt:null, stoppedAt:null };
   // picking a team only arms the timer screen (clock at 00:00, not running yet) —
   // 시작/종료 on that screen itself are what actually start/stop the clock.
+  // 종료 freezes the clock (stoppedAt) but doesn't save yet — 시간 확정 does,
+  // so the finished time stays on screen until someone explicitly confirms it.
   const armDay3Timer = (teamId)=> update(s=>{
-    s.display.day3Timer = { teamId, startedAt:null };
+    s.display.day3Timer = { teamId, startedAt:null, stoppedAt:null };
     return s;
   });
   const startDay3Timer = ()=> update(s=>{
     const t = s.display.day3Timer;
     if(!t || !t.teamId) return null;
-    s.display.day3Timer = { teamId: t.teamId, startedAt: Date.now() };
+    s.display.day3Timer = { teamId: t.teamId, startedAt: Date.now(), stoppedAt:null };
     return s;
   });
   const endDay3Timer = ()=> update(s=>{
     const t = s.display.day3Timer;
     if(!t || !t.teamId) return null;
-    if(t.startedAt!=null){
-      const e = s.days.day3.entries.find(x=>x.teamId===t.teamId);
-      if(e) e.timeSec = (Date.now()-t.startedAt)/1000;
+    if(t.startedAt==null){
+      // armed but never started — 종료 here just cancels back to the list
+      s.display.day3Timer = { teamId:null, startedAt:null, stoppedAt:null };
+    } else {
+      s.display.day3Timer = { teamId:t.teamId, startedAt:t.startedAt, stoppedAt:Date.now() };
     }
-    s.display.day3Timer = { teamId:null, startedAt:null };
+    return s;
+  });
+  const confirmDay3Timer = ()=> update(s=>{
+    const t = s.display.day3Timer;
+    if(!t || !t.teamId || t.stoppedAt==null) return null;
+    const e = s.days.day3.entries.find(x=>x.teamId===t.teamId);
+    if(e) e.timeSec = (t.stoppedAt-t.startedAt)/1000;
+    s.display.day3Timer = { teamId:null, startedAt:null, stoppedAt:null };
     return s;
   });
 
@@ -807,8 +827,8 @@ function DisplayView({ state, update }){
           {info.format==="bracket"
             ? <InteractiveBracketSection dayKey={activeKey} state={state} update={update} teamsById={teamsById} />
             : (day3Timer.teamId
-                ? <Day3TimerBanner team={teamsById[day3Timer.teamId]} startedAt={day3Timer.startedAt}
-                    onStart={startDay3Timer} onEnd={endDay3Timer} />
+                ? <Day3TimerBanner team={teamsById[day3Timer.teamId]} startedAt={day3Timer.startedAt} stoppedAt={day3Timer.stoppedAt}
+                    onStart={startDay3Timer} onEnd={endDay3Timer} onConfirm={confirmDay3Timer} />
                 : <RankingBoard day3={state.days.day3} teamsById={teamsById} execTeamIds={execTeamIds} editable={true}
                     onSetTime={setDay3Time} onStartTimer={armDay3Timer} />)}
         </div>

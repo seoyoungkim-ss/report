@@ -134,10 +134,13 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .day3-timer-banner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:60px 20px;}
 .day3-timer-clock{font-size:180px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);
   text-shadow:0 0 30px rgba(255,209,102,.6);line-height:1;}
+.day3-timer-clock.finished{color:var(--green);text-shadow:0 0 36px rgba(61,220,132,.65);}
 .day3-timer-controls{display:flex;gap:24px;}
 .timer-start-btn-big,.timer-stop-btn-big{padding:16px 48px;font-size:28px;border-radius:14px;}
 .timer-start-btn-big{box-shadow:0 0 24px rgba(38,224,217,.5);}
 .timer-stop-btn-big{box-shadow:0 0 24px rgba(255,92,92,.5);}
+.timer-confirm-btn{border:none;border-radius:14px;padding:16px 48px;font-size:28px;font-weight:800;
+  background:var(--green);color:#04220f;cursor:pointer;box-shadow:0 0 24px rgba(61,220,132,.5);}
 .rank-time{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--sub);font-weight:700;}
 .rank-time-input{margin-left:auto;width:110px;text-align:right;font-variant-numeric:tabular-nums;
   background:#081a34;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700;}
@@ -792,7 +795,8 @@ function createDefaultState() {
       activeDayKey: "day1",
       day3Timer: {
         teamId: null,
-        startedAt: null
+        startedAt: null,
+        stoppedAt: null
       }
     }
   };
@@ -1542,27 +1546,37 @@ function RankingBoard({
    on the TV screen instead of the ranking list. Picking a team from the
    list only arms this screen (clock sits at 00:00, not yet running); 시작
    and 종료 are both operated right here so everyone watching sees the exact
-   moment the clock actually starts and stops, not just when a team is picked. */
+   moment the clock actually starts and stops, not just when a team is picked.
+   종료 freezes the clock on the final time rather than saving right away —
+   the record isn't written until 시간 확정 is pressed, so the finished time
+   stays up on screen for everyone to read before the view moves on. */
 function Day3TimerBanner({
   team,
   startedAt,
+  stoppedAt,
   onStart,
-  onEnd
+  onEnd,
+  onConfirm
 }) {
-  const running = startedAt != null;
-  const elapsed = useElapsedSeconds(startedAt);
+  const running = startedAt != null && stoppedAt == null;
+  const finished = stoppedAt != null;
+  const liveElapsed = useElapsedSeconds(running ? startedAt : null);
+  const displaySec = finished ? (stoppedAt - startedAt) / 1000 : running ? liveElapsed : 0;
   return /*#__PURE__*/React.createElement("div", {
     className: "day3-timer-banner"
   }, /*#__PURE__*/React.createElement(TeamChip, {
     team: team,
     size: "big"
   }), /*#__PURE__*/React.createElement("div", {
-    className: "day3-timer-clock"
-  }, fmtTime(running ? elapsed : 0)), /*#__PURE__*/React.createElement("div", {
+    className: "day3-timer-clock" + (finished ? " finished" : "")
+  }, fmtTime(displaySec)), finished ? /*#__PURE__*/React.createElement("button", {
+    className: "timer-confirm-btn",
+    onClick: onConfirm
+  }, "\u2714 \uC2DC\uAC04 \uD655\uC815") : /*#__PURE__*/React.createElement("div", {
     className: "day3-timer-controls"
   }, /*#__PURE__*/React.createElement("button", {
     className: "timer-start-btn timer-start-btn-big",
-    disabled: running,
+    disabled: startedAt != null,
     onClick: onStart
   }, "\u25B6 \uC2DC\uC791"), /*#__PURE__*/React.createElement("button", {
     className: "timer-stop-btn timer-stop-btn-big",
@@ -1588,14 +1602,18 @@ function DisplayView({
   });
   const day3Timer = state.display.day3Timer || {
     teamId: null,
-    startedAt: null
+    startedAt: null,
+    stoppedAt: null
   };
   // picking a team only arms the timer screen (clock at 00:00, not running yet) —
   // 시작/종료 on that screen itself are what actually start/stop the clock.
+  // 종료 freezes the clock (stoppedAt) but doesn't save yet — 시간 확정 does,
+  // so the finished time stays on screen until someone explicitly confirms it.
   const armDay3Timer = teamId => update(s => {
     s.display.day3Timer = {
       teamId,
-      startedAt: null
+      startedAt: null,
+      stoppedAt: null
     };
     return s;
   });
@@ -1604,20 +1622,39 @@ function DisplayView({
     if (!t || !t.teamId) return null;
     s.display.day3Timer = {
       teamId: t.teamId,
-      startedAt: Date.now()
+      startedAt: Date.now(),
+      stoppedAt: null
     };
     return s;
   });
   const endDay3Timer = () => update(s => {
     const t = s.display.day3Timer;
     if (!t || !t.teamId) return null;
-    if (t.startedAt != null) {
-      const e = s.days.day3.entries.find(x => x.teamId === t.teamId);
-      if (e) e.timeSec = (Date.now() - t.startedAt) / 1000;
+    if (t.startedAt == null) {
+      // armed but never started — 종료 here just cancels back to the list
+      s.display.day3Timer = {
+        teamId: null,
+        startedAt: null,
+        stoppedAt: null
+      };
+    } else {
+      s.display.day3Timer = {
+        teamId: t.teamId,
+        startedAt: t.startedAt,
+        stoppedAt: Date.now()
+      };
     }
+    return s;
+  });
+  const confirmDay3Timer = () => update(s => {
+    const t = s.display.day3Timer;
+    if (!t || !t.teamId || t.stoppedAt == null) return null;
+    const e = s.days.day3.entries.find(x => x.teamId === t.teamId);
+    if (e) e.timeSec = (t.stoppedAt - t.startedAt) / 1000;
     s.display.day3Timer = {
       teamId: null,
-      startedAt: null
+      startedAt: null,
+      stoppedAt: null
     };
     return s;
   });
@@ -1710,8 +1747,10 @@ function DisplayView({
   }) : day3Timer.teamId ? /*#__PURE__*/React.createElement(Day3TimerBanner, {
     team: teamsById[day3Timer.teamId],
     startedAt: day3Timer.startedAt,
+    stoppedAt: day3Timer.stoppedAt,
     onStart: startDay3Timer,
-    onEnd: endDay3Timer
+    onEnd: endDay3Timer,
+    onConfirm: confirmDay3Timer
   }) : /*#__PURE__*/React.createElement(RankingBoard, {
     day3: state.days.day3,
     teamsById: teamsById,

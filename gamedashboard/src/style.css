@@ -126,10 +126,13 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .day3-timer-banner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:60px 20px;}
 .day3-timer-clock{font-size:180px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);
   text-shadow:0 0 30px rgba(255,209,102,.6);line-height:1;}
+.day3-timer-clock.finished{color:var(--green);text-shadow:0 0 36px rgba(61,220,132,.65);}
 .day3-timer-controls{display:flex;gap:24px;}
 .timer-start-btn-big,.timer-stop-btn-big{padding:16px 48px;font-size:28px;border-radius:14px;}
 .timer-start-btn-big{box-shadow:0 0 24px rgba(38,224,217,.5);}
 .timer-stop-btn-big{box-shadow:0 0 24px rgba(255,92,92,.5);}
+.timer-confirm-btn{border:none;border-radius:14px;padding:16px 48px;font-size:28px;font-weight:800;
+  background:var(--green);color:#04220f;cursor:pointer;box-shadow:0 0 24px rgba(61,220,132,.5);}
 .rank-time{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--sub);font-weight:700;}
 .rank-time-input{margin-left:auto;width:110px;text-align:right;font-variant-numeric:tabular-nums;
   background:#081a34;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700;}
