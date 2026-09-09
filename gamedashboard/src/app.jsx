@@ -472,10 +472,12 @@ function TeamChip({team, size, exec, champion}){
   if(!team) return <span className="slot tbd">TBD</span>;
   return (
     <span className="team-chip">
-      {champion && <span className="crown" title="우승">👑</span>}
-      {team.image
-        ? <img className={"team-avatar" + (size==="big"?" big":"") + (champion?" champion":"")} src={team.image} />
-        : <span className={"dot" + (champion?" champion":"")} style={{width:size==="big"?52:22,height:size==="big"?52:22,borderRadius:"50%",background:team.color,flex:"none",border:"2px solid rgba(255,255,255,.25)"}}></span>}
+      <span className="avatar-wrap">
+        {champion && <span className={"crown" + (size==="big"?" big":"")} title="우승">👑</span>}
+        {team.image
+          ? <img className={"team-avatar" + (size==="big"?" big":"") + (champion?" champion":"")} src={team.image} />
+          : <span className={"dot" + (champion?" champion":"")} style={{width:size==="big"?52:22,height:size==="big"?52:22,borderRadius:"50%",background:team.color,flex:"none",border:"2px solid rgba(255,255,255,.25)"}}></span>}
+      </span>
       <span className="team-name">{team.name}</span>
       {exec && <span className="exec-badge" title={`임원 참여 ×${EXEC_MULTIPLIER}`}>⚡×{EXEC_MULTIPLIER}</span>}
     </span>
@@ -733,11 +735,23 @@ function Day3TimerBanner({ team, startedAt, stoppedAt, onStart, onEnd, onConfirm
 
 /* Final ceremony screen — cumulative TOP4 by computeOverall(), independent
    of activeDayKey so it never has to pretend to be a "day". */
-function AwardsCeremonyView({ state }){
+function AwardsCeremonyView({ state, update }){
   const overall = useMemo(()=>computeOverall(state),[state]);
   const top4 = overall.slice(0,4);
   const order = [1,0,2,3]; // drawn left-to-right: 2nd, 1st, 3rd, 4th — classic podium order
   const revealed = !!state.display.awardsRevealed;
+  const revealAwards = ()=> update(s=>{ s.display.awardsRevealed = true; return s; });
+  // the champion's rank in each individual day — only computed once revealed,
+  // and never shown before then, so it can't spoil who the champion is.
+  const championDayRanks = useMemo(()=>{
+    if(!revealed || !top4[0]) return null;
+    const champ = top4[0];
+    return DAYS.map(d=>{
+      const ranking = computeTodayRanking(state, d.key);
+      const entry = ranking.find(t=>t.id===champ.id);
+      return { day: d, rank: entry ? entry.rank : null };
+    });
+  },[state, revealed, top4]);
   return (
     <div>
       <div className="topbar">
@@ -748,8 +762,25 @@ function AwardsCeremonyView({ state }){
         </div>
       </div>
       <div className="awards-podium-wrap">
+        {revealed && championDayRanks &&
+          <div className="awards-champion-days">
+            <div className="awards-champion-days-title">🏆 {top4[0].name} 종목별 순위</div>
+            <div className="awards-champion-days-grid">
+              {championDayRanks.map(({day,rank})=>(
+                <div className="acd-chip" key={day.key}>
+                  <span className="acd-label">{day.label}</span>
+                  <span className="acd-rank">{rank ? `${rank}등` : "-"}</span>
+                </div>
+              ))}
+            </div>
+          </div>}
         <div className="awards-podium-title">🏆 최종 순위 시상 🏆</div>
-        {!revealed && <div className="awards-suspense">두구두구두구... 곧 발표됩니다!</div>}
+        {!revealed && (
+          <>
+            <div className="awards-suspense">두구두구두구... 곧 발표됩니다!</div>
+            <button className="awards-reveal-btn" onClick={revealAwards}>📢 결과발표</button>
+          </>
+        )}
         <div className="awards-podium">
           {order.map(rankIdx=>{
             const t = top4[rankIdx];
@@ -1256,7 +1287,6 @@ function RulesTab({ state }){
 function ControlTab({ state, update }){
   const setActive = (key)=> update(s=>{ s.display.activeDayKey = key; s.display.showAwards = false; s.display.awardsRevealed = false; return s; });
   const showAwards = ()=> update(s=>{ s.display.showAwards = true; s.display.awardsRevealed = false; return s; });
-  const revealAwards = ()=> update(s=>{ s.display.awardsRevealed = true; return s; });
   const resetAll = ()=>{
     if(!window.confirm("이 브라우저에 저장된 모든 데이터(팀 정보, 대진표, 순위, 배점 설정 등)를 지우고 초기 상태로 되돌립니다. 계속할까요?")) return;
     try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
@@ -1345,14 +1375,9 @@ function ControlTab({ state, update }){
         </button>
       </div>
       {state.display.showAwards &&
-        <div style={{marginTop:14,paddingTop:14,borderTop:"1px dashed var(--line)"}}>
-          <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
-            시상식 화면은 순위를 가린 채로 먼저 뜹니다. 아래 버튼을 누르는 순간 TV 화면에 순위가 공개됩니다.
-          </p>
-          <button className="small-btn" disabled={state.display.awardsRevealed} onClick={revealAwards}>
-            {state.display.awardsRevealed ? "✅ 발표 완료" : "📢 결과발표"}
-          </button>
-        </div>}
+        <p style={{color:"var(--sub)",fontSize:12,marginTop:10}}>
+          결과 공개는 관리자 화면이 아니라 TV 송출 화면에 뜨는 "📢 결과발표" 버튼으로 직접 조작합니다.
+        </p>}
       <div style={{marginTop:18,paddingTop:16,borderTop:"1px dashed var(--line)"}}>
         <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
           선택된 Day({activeDay.label} · {activeDay.game})의 결과로 포스터 제작용 프롬프트와 엑셀을 내려받습니다.
@@ -1517,7 +1542,7 @@ function App(){
                 })}
               </div>}
               {state.display.showAwards
-                ? <AwardsCeremonyView state={state} />
+                ? <AwardsCeremonyView state={state} update={update} />
                 : <DisplayView state={state} update={update} />}
             </div>
           </div>

@@ -125,8 +125,18 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .turn-badge{font-size:11px;font-weight:700;color:var(--sub);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;flex:none;white-space:nowrap;}
 
 /* ---------- final awards ceremony (podium) ---------- */
-.awards-podium-wrap{display:flex;flex-direction:column;align-items:center;gap:28px;padding:30px 40px 0;}
+.awards-podium-wrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:28px;padding:30px 40px 0;}
 .awards-podium-title{font-size:44px;font-weight:900;color:var(--gold);text-shadow:0 0 20px rgba(255,209,102,.5);}
+.awards-reveal-btn{border:none;border-radius:14px;padding:16px 48px;font-size:28px;font-weight:800;
+  background:var(--gold);color:#3a2400;cursor:pointer;box-shadow:0 0 30px rgba(255,209,102,.55);}
+.awards-champion-days{position:absolute;top:0;right:20px;background:linear-gradient(90deg,var(--panel),var(--panel2));
+  border:2px solid var(--gold);border-radius:14px;padding:12px 16px;box-shadow:0 0 20px rgba(255,209,102,.3);}
+.awards-champion-days-title{font-size:14px;font-weight:800;color:var(--gold);margin-bottom:8px;white-space:nowrap;}
+.awards-champion-days-grid{display:flex;gap:8px;}
+.acd-chip{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:8px;padding:6px 12px;min-width:56px;}
+.acd-label{font-size:11px;color:var(--sub);font-weight:700;white-space:nowrap;}
+.acd-rank{font-size:18px;font-weight:900;color:var(--text);}
 .awards-podium{display:flex;align-items:flex-end;justify-content:center;gap:28px;}
 .podium-block{display:flex;flex-direction:column;align-items:center;gap:14px;width:340px;flex:none;}
 .podium-team{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;min-height:110px;}
@@ -171,14 +181,18 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 
 /* ---------- team chip ---------- */
 .team-chip{display:flex;align-items:center;gap:10px;}
+.avatar-wrap{position:relative;display:inline-flex;flex:none;}
 .team-avatar{width:51px;height:51px;border-radius:50%;object-fit:cover;background:#1c3a68;flex:none;border:2px solid rgba(255,255,255,.25);}
 .team-avatar.big{width:78px;height:78px;}
 .team-avatar.champion,.dot.champion{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,209,102,.5),0 0 12px rgba(255,209,102,.6);}
 .team-name{font-weight:800;}
 .exec-badge{font-size:10px;font-weight:900;color:#241a00;background:var(--gold);border-radius:6px;padding:2px 6px;flex:none;}
-/* the winner of a day's final (or 1등 on the ranking day) — a crown so
-   the overall champion is obvious at a glance, not just "gold text". */
-.crown{font-size:16px;line-height:1;flex:none;filter:drop-shadow(0 0 4px rgba(255,209,102,.7));}
+/* the winner of a day's final (or 1등 on the ranking day) — a bigger crown
+   worn right on top of the avatar so the overall champion is obvious at a
+   glance, not just "gold text". */
+.crown{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:26px;line-height:1;z-index:1;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
+.crown.big{font-size:40px;top:-24px;}
 
 /* ---------- overall top9 (compact, top-right, all 9 visible at once) ---------- */
 /* two stacked panels: cumulative standings on top, today's own
@@ -1198,8 +1212,10 @@ function TeamChip({
   }, "TBD");
   return /*#__PURE__*/React.createElement("span", {
     className: "team-chip"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "avatar-wrap"
   }, champion && /*#__PURE__*/React.createElement("span", {
-    className: "crown",
+    className: "crown" + (size === "big" ? " big" : ""),
     title: "\uC6B0\uC2B9"
   }, "\uD83D\uDC51"), team.image ? /*#__PURE__*/React.createElement("img", {
     className: "team-avatar" + (size === "big" ? " big" : "") + (champion ? " champion" : ""),
@@ -1214,7 +1230,7 @@ function TeamChip({
       flex: "none",
       border: "2px solid rgba(255,255,255,.25)"
     }
-  }), /*#__PURE__*/React.createElement("span", {
+  })), /*#__PURE__*/React.createElement("span", {
     className: "team-name"
   }, team.name), exec && /*#__PURE__*/React.createElement("span", {
     className: "exec-badge",
@@ -1619,12 +1635,31 @@ function Day3TimerBanner({
 /* Final ceremony screen — cumulative TOP4 by computeOverall(), independent
    of activeDayKey so it never has to pretend to be a "day". */
 function AwardsCeremonyView({
-  state
+  state,
+  update
 }) {
   const overall = useMemo(() => computeOverall(state), [state]);
   const top4 = overall.slice(0, 4);
   const order = [1, 0, 2, 3]; // drawn left-to-right: 2nd, 1st, 3rd, 4th — classic podium order
   const revealed = !!state.display.awardsRevealed;
+  const revealAwards = () => update(s => {
+    s.display.awardsRevealed = true;
+    return s;
+  });
+  // the champion's rank in each individual day — only computed once revealed,
+  // and never shown before then, so it can't spoil who the champion is.
+  const championDayRanks = useMemo(() => {
+    if (!revealed || !top4[0]) return null;
+    const champ = top4[0];
+    return DAYS.map(d => {
+      const ranking = computeTodayRanking(state, d.key);
+      const entry = ranking.find(t => t.id === champ.id);
+      return {
+        day: d,
+        rank: entry ? entry.rank : null
+      };
+    });
+  }, [state, revealed, top4]);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1639,11 +1674,30 @@ function AwardsCeremonyView({
     className: "game"
   }, "\uCD5C\uC885 \uC2DC\uC0C1\uC2DD"))), /*#__PURE__*/React.createElement("div", {
     className: "awards-podium-wrap"
+  }, revealed && championDayRanks && /*#__PURE__*/React.createElement("div", {
+    className: "awards-champion-days"
   }, /*#__PURE__*/React.createElement("div", {
+    className: "awards-champion-days-title"
+  }, "\uD83C\uDFC6 ", top4[0].name, " \uC885\uBAA9\uBCC4 \uC21C\uC704"), /*#__PURE__*/React.createElement("div", {
+    className: "awards-champion-days-grid"
+  }, championDayRanks.map(({
+    day,
+    rank
+  }) => /*#__PURE__*/React.createElement("div", {
+    className: "acd-chip",
+    key: day.key
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "acd-label"
+  }, day.label), /*#__PURE__*/React.createElement("span", {
+    className: "acd-rank"
+  }, rank ? `${rank}등` : "-"))))), /*#__PURE__*/React.createElement("div", {
     className: "awards-podium-title"
-  }, "\uD83C\uDFC6 \uCD5C\uC885 \uC21C\uC704 \uC2DC\uC0C1 \uD83C\uDFC6"), !revealed && /*#__PURE__*/React.createElement("div", {
+  }, "\uD83C\uDFC6 \uCD5C\uC885 \uC21C\uC704 \uC2DC\uC0C1 \uD83C\uDFC6"), !revealed && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "awards-suspense"
-  }, "\uB450\uAD6C\uB450\uAD6C\uB450\uAD6C... \uACE7 \uBC1C\uD45C\uB429\uB2C8\uB2E4!"), /*#__PURE__*/React.createElement("div", {
+  }, "\uB450\uAD6C\uB450\uAD6C\uB450\uAD6C... \uACE7 \uBC1C\uD45C\uB429\uB2C8\uB2E4!"), /*#__PURE__*/React.createElement("button", {
+    className: "awards-reveal-btn",
+    onClick: revealAwards
+  }, "\uD83D\uDCE2 \uACB0\uACFC\uBC1C\uD45C")), /*#__PURE__*/React.createElement("div", {
     className: "awards-podium"
   }, order.map(rankIdx => {
     const t = top4[rankIdx];
@@ -2405,10 +2459,6 @@ function ControlTab({
     s.display.awardsRevealed = false;
     return s;
   });
-  const revealAwards = () => update(s => {
-    s.display.awardsRevealed = true;
-    return s;
-  });
   const resetAll = () => {
     if (!window.confirm("이 브라우저에 저장된 모든 데이터(팀 정보, 대진표, 순위, 배점 설정 등)를 지우고 초기 상태로 되돌립니다. 계속할까요?")) return;
     try {
@@ -2508,23 +2558,13 @@ function ControlTab({
   }, d.label, " \xB7 ", d.game)), /*#__PURE__*/React.createElement("button", {
     className: "tab-btn" + (state.display.showAwards ? " active" : ""),
     onClick: showAwards
-  }, "\uD83C\uDFC6 \uCD5C\uC885 \uC2DC\uC0C1\uC2DD")), state.display.showAwards && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 14,
-      paddingTop: 14,
-      borderTop: "1px dashed var(--line)"
-    }
-  }, /*#__PURE__*/React.createElement("p", {
+  }, "\uD83C\uDFC6 \uCD5C\uC885 \uC2DC\uC0C1\uC2DD")), state.display.showAwards && /*#__PURE__*/React.createElement("p", {
     style: {
       color: "var(--sub)",
       fontSize: 12,
-      marginBottom: 8
+      marginTop: 10
     }
-  }, "\uC2DC\uC0C1\uC2DD \uD654\uBA74\uC740 \uC21C\uC704\uB97C \uAC00\uB9B0 \uCC44\uB85C \uBA3C\uC800 \uB739\uB2C8\uB2E4. \uC544\uB798 \uBC84\uD2BC\uC744 \uB204\uB974\uB294 \uC21C\uAC04 TV \uD654\uBA74\uC5D0 \uC21C\uC704\uAC00 \uACF5\uAC1C\uB429\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("button", {
-    className: "small-btn",
-    disabled: state.display.awardsRevealed,
-    onClick: revealAwards
-  }, state.display.awardsRevealed ? "✅ 발표 완료" : "📢 결과발표")), /*#__PURE__*/React.createElement("div", {
+  }, "\uACB0\uACFC \uACF5\uAC1C\uB294 \uAD00\uB9AC\uC790 \uD654\uBA74\uC774 \uC544\uB2C8\uB77C TV \uC1A1\uCD9C \uD654\uBA74\uC5D0 \uB728\uB294 \"\uD83D\uDCE2 \uACB0\uACFC\uBC1C\uD45C\" \uBC84\uD2BC\uC73C\uB85C \uC9C1\uC811 \uC870\uC791\uD569\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18,
       paddingTop: 16,
@@ -2838,7 +2878,8 @@ function App() {
       size: heroSize
     }));
   })), state.display.showAwards ? /*#__PURE__*/React.createElement(AwardsCeremonyView, {
-    state: state
+    state: state,
+    update: update
   }) : /*#__PURE__*/React.createElement(DisplayView, {
     state: state,
     update: update

@@ -117,8 +117,18 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .turn-badge{font-size:11px;font-weight:700;color:var(--sub);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;flex:none;white-space:nowrap;}
 
 /* ---------- final awards ceremony (podium) ---------- */
-.awards-podium-wrap{display:flex;flex-direction:column;align-items:center;gap:28px;padding:30px 40px 0;}
+.awards-podium-wrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:28px;padding:30px 40px 0;}
 .awards-podium-title{font-size:44px;font-weight:900;color:var(--gold);text-shadow:0 0 20px rgba(255,209,102,.5);}
+.awards-reveal-btn{border:none;border-radius:14px;padding:16px 48px;font-size:28px;font-weight:800;
+  background:var(--gold);color:#3a2400;cursor:pointer;box-shadow:0 0 30px rgba(255,209,102,.55);}
+.awards-champion-days{position:absolute;top:0;right:20px;background:linear-gradient(90deg,var(--panel),var(--panel2));
+  border:2px solid var(--gold);border-radius:14px;padding:12px 16px;box-shadow:0 0 20px rgba(255,209,102,.3);}
+.awards-champion-days-title{font-size:14px;font-weight:800;color:var(--gold);margin-bottom:8px;white-space:nowrap;}
+.awards-champion-days-grid{display:flex;gap:8px;}
+.acd-chip{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:8px;padding:6px 12px;min-width:56px;}
+.acd-label{font-size:11px;color:var(--sub);font-weight:700;white-space:nowrap;}
+.acd-rank{font-size:18px;font-weight:900;color:var(--text);}
 .awards-podium{display:flex;align-items:flex-end;justify-content:center;gap:28px;}
 .podium-block{display:flex;flex-direction:column;align-items:center;gap:14px;width:340px;flex:none;}
 .podium-team{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;min-height:110px;}
@@ -163,14 +173,18 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 
 /* ---------- team chip ---------- */
 .team-chip{display:flex;align-items:center;gap:10px;}
+.avatar-wrap{position:relative;display:inline-flex;flex:none;}
 .team-avatar{width:51px;height:51px;border-radius:50%;object-fit:cover;background:#1c3a68;flex:none;border:2px solid rgba(255,255,255,.25);}
 .team-avatar.big{width:78px;height:78px;}
 .team-avatar.champion,.dot.champion{border-color:var(--gold);box-shadow:0 0 0 2px rgba(255,209,102,.5),0 0 12px rgba(255,209,102,.6);}
 .team-name{font-weight:800;}
 .exec-badge{font-size:10px;font-weight:900;color:#241a00;background:var(--gold);border-radius:6px;padding:2px 6px;flex:none;}
-/* the winner of a day's final (or 1등 on the ranking day) — a crown so
-   the overall champion is obvious at a glance, not just "gold text". */
-.crown{font-size:16px;line-height:1;flex:none;filter:drop-shadow(0 0 4px rgba(255,209,102,.7));}
+/* the winner of a day's final (or 1등 on the ranking day) — a bigger crown
+   worn right on top of the avatar so the overall champion is obvious at a
+   glance, not just "gold text". */
+.crown{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:26px;line-height:1;z-index:1;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
+.crown.big{font-size:40px;top:-24px;}
 
 /* ---------- overall top9 (compact, top-right, all 9 visible at once) ---------- */
 /* two stacked panels: cumulative standings on top, today's own
