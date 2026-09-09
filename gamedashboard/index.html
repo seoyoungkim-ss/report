@@ -127,13 +127,17 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 /* ---------- day3 live timer (operated directly on the TV screen so
    everyone watching sees the exact start/stop moment) ---------- */
 .timer-start-btn,.timer-stop-btn{border:none;border-radius:8px;padding:8px 18px;font-weight:800;font-size:15px;cursor:pointer;flex:none;}
-.timer-start-btn{background:var(--cyan);color:#04202a;margin-left:auto;}
+.timer-start-btn{background:var(--cyan);color:#04202a;}
+.rank-row .timer-start-btn{margin-left:auto;}
 .timer-start-btn:disabled{opacity:.35;cursor:default;}
 .timer-stop-btn{background:var(--red);color:#fff;}
 .day3-timer-banner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:60px 20px;}
 .day3-timer-clock{font-size:180px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);
   text-shadow:0 0 30px rgba(255,209,102,.6);line-height:1;}
-.timer-stop-btn-big{padding:16px 48px;font-size:28px;border-radius:14px;box-shadow:0 0 24px rgba(255,92,92,.5);}
+.day3-timer-controls{display:flex;gap:24px;}
+.timer-start-btn-big,.timer-stop-btn-big{padding:16px 48px;font-size:28px;border-radius:14px;}
+.timer-start-btn-big{box-shadow:0 0 24px rgba(38,224,217,.5);}
+.timer-stop-btn-big{box-shadow:0 0 24px rgba(255,92,92,.5);}
 .rank-time{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--sub);font-weight:700;}
 .rank-time-input{margin-left:auto;width:110px;text-align:right;font-variant-numeric:tabular-nums;
   background:#081a34;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700;}
@@ -1534,15 +1538,18 @@ function RankingBoard({
     }, e.timeSec != null ? fmtTime(e.timeSec) : "미기록"));
   }));
 }
-/* Full-screen "on air" timer for the team currently running Day3's course —
-   shown on the TV screen instead of the ranking list while a timer is live.
-   Start/stop is operated right here (not from the admin tab) so everyone
-   watching the screen sees the exact moment it starts and stops. */
+/* Full-screen "on air" timer for the team picked for Day3's course — shown
+   on the TV screen instead of the ranking list. Picking a team from the
+   list only arms this screen (clock sits at 00:00, not yet running); 시작
+   and 종료 are both operated right here so everyone watching sees the exact
+   moment the clock actually starts and stops, not just when a team is picked. */
 function Day3TimerBanner({
   team,
   startedAt,
-  onStop
+  onStart,
+  onEnd
 }) {
+  const running = startedAt != null;
   const elapsed = useElapsedSeconds(startedAt);
   return /*#__PURE__*/React.createElement("div", {
     className: "day3-timer-banner"
@@ -1551,10 +1558,16 @@ function Day3TimerBanner({
     size: "big"
   }), /*#__PURE__*/React.createElement("div", {
     className: "day3-timer-clock"
-  }, fmtTime(elapsed)), /*#__PURE__*/React.createElement("button", {
+  }, fmtTime(running ? elapsed : 0)), /*#__PURE__*/React.createElement("div", {
+    className: "day3-timer-controls"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "timer-start-btn timer-start-btn-big",
+    disabled: running,
+    onClick: onStart
+  }, "\u25B6 \uC2DC\uC791"), /*#__PURE__*/React.createElement("button", {
     className: "timer-stop-btn timer-stop-btn-big",
-    onClick: onStop
-  }, "\u25A0 \uC815\uC9C0"));
+    onClick: onEnd
+  }, "\u25A0 \uC885\uB8CC")));
 }
 
 /* ============================== display view ============================== */
@@ -1577,18 +1590,31 @@ function DisplayView({
     teamId: null,
     startedAt: null
   };
-  const startDay3Timer = teamId => update(s => {
+  // picking a team only arms the timer screen (clock at 00:00, not running yet) —
+  // 시작/종료 on that screen itself are what actually start/stop the clock.
+  const armDay3Timer = teamId => update(s => {
     s.display.day3Timer = {
       teamId,
+      startedAt: null
+    };
+    return s;
+  });
+  const startDay3Timer = () => update(s => {
+    const t = s.display.day3Timer;
+    if (!t || !t.teamId) return null;
+    s.display.day3Timer = {
+      teamId: t.teamId,
       startedAt: Date.now()
     };
     return s;
   });
-  const stopDay3Timer = () => update(s => {
+  const endDay3Timer = () => update(s => {
     const t = s.display.day3Timer;
     if (!t || !t.teamId) return null;
-    const e = s.days.day3.entries.find(x => x.teamId === t.teamId);
-    if (e) e.timeSec = (Date.now() - t.startedAt) / 1000;
+    if (t.startedAt != null) {
+      const e = s.days.day3.entries.find(x => x.teamId === t.teamId);
+      if (e) e.timeSec = (Date.now() - t.startedAt) / 1000;
+    }
     s.display.day3Timer = {
       teamId: null,
       startedAt: null
@@ -1684,14 +1710,15 @@ function DisplayView({
   }) : day3Timer.teamId ? /*#__PURE__*/React.createElement(Day3TimerBanner, {
     team: teamsById[day3Timer.teamId],
     startedAt: day3Timer.startedAt,
-    onStop: stopDay3Timer
+    onStart: startDay3Timer,
+    onEnd: endDay3Timer
   }) : /*#__PURE__*/React.createElement(RankingBoard, {
     day3: state.days.day3,
     teamsById: teamsById,
     execTeamIds: execTeamIds,
     editable: true,
     onSetTime: setDay3Time,
-    onStartTimer: startDay3Timer
+    onStartTimer: armDay3Timer
   }))));
 }
 
