@@ -121,8 +121,12 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .awards-podium-title{font-size:44px;font-weight:900;color:var(--gold);text-shadow:0 0 20px rgba(255,209,102,.5);}
 .awards-podium{display:flex;align-items:flex-end;justify-content:center;gap:28px;}
 .podium-block{display:flex;flex-direction:column;align-items:center;gap:14px;width:340px;flex:none;}
-.podium-team{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.podium-team{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;min-height:110px;}
+.podium-r1 .podium-team{min-height:150px;}
 .podium-score{font-size:26px;font-weight:900;color:var(--gold);}
+.awards-suspense{font-size:20px;color:var(--sub);font-weight:700;letter-spacing:1px;}
+.podium-mystery{font-size:56px;font-weight:900;color:var(--sub);opacity:.6;}
+.podium-mystery.big{font-size:80px;}
 .podium-pedestal{width:340px;border-radius:18px 18px 4px 4px;display:flex;justify-content:center;padding-top:16px;
   box-shadow:0 10px 30px rgba(4,20,40,.35);}
 .podium-num{font-weight:900;line-height:1;text-shadow:0 5px 0 rgba(0,0,0,.25);}
@@ -203,6 +207,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .small-btn.primary{background:linear-gradient(90deg,var(--orange),var(--orange2));border:none;color:#241000;}
 .small-btn.ghost{background:transparent;}
 .small-btn:hover{filter:brightness(1.1);}
+.small-btn:disabled{opacity:.5;cursor:default;filter:none;}
 .day-header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
 .day-header .title{font-size:18px;font-weight:900;}
 .day-header .sub{color:var(--sub);font-size:13px;}

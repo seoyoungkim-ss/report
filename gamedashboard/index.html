@@ -129,8 +129,12 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .awards-podium-title{font-size:44px;font-weight:900;color:var(--gold);text-shadow:0 0 20px rgba(255,209,102,.5);}
 .awards-podium{display:flex;align-items:flex-end;justify-content:center;gap:28px;}
 .podium-block{display:flex;flex-direction:column;align-items:center;gap:14px;width:340px;flex:none;}
-.podium-team{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.podium-team{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;min-height:110px;}
+.podium-r1 .podium-team{min-height:150px;}
 .podium-score{font-size:26px;font-weight:900;color:var(--gold);}
+.awards-suspense{font-size:20px;color:var(--sub);font-weight:700;letter-spacing:1px;}
+.podium-mystery{font-size:56px;font-weight:900;color:var(--sub);opacity:.6;}
+.podium-mystery.big{font-size:80px;}
 .podium-pedestal{width:340px;border-radius:18px 18px 4px 4px;display:flex;justify-content:center;padding-top:16px;
   box-shadow:0 10px 30px rgba(4,20,40,.35);}
 .podium-num{font-weight:900;line-height:1;text-shadow:0 5px 0 rgba(0,0,0,.25);}
@@ -211,6 +215,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .small-btn.primary{background:linear-gradient(90deg,var(--orange),var(--orange2));border:none;color:#241000;}
 .small-btn.ghost{background:transparent;}
 .small-btn:hover{filter:brightness(1.1);}
+.small-btn:disabled{opacity:.5;cursor:default;filter:none;}
 .day-header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
 .day-header .title{font-size:18px;font-weight:900;}
 .day-header .sub{color:var(--sub);font-size:13px;}
@@ -814,6 +819,7 @@ function createDefaultState() {
     display: {
       activeDayKey: "day1",
       showAwards: false,
+      awardsRevealed: false,
       day3Timer: {
         teamId: null,
         startedAt: null,
@@ -1618,6 +1624,7 @@ function AwardsCeremonyView({
   const overall = useMemo(() => computeOverall(state), [state]);
   const top4 = overall.slice(0, 4);
   const order = [1, 0, 2, 3]; // drawn left-to-right: 2nd, 1st, 3rd, 4th — classic podium order
+  const revealed = !!state.display.awardsRevealed;
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1634,7 +1641,9 @@ function AwardsCeremonyView({
     className: "awards-podium-wrap"
   }, /*#__PURE__*/React.createElement("div", {
     className: "awards-podium-title"
-  }, "\uD83C\uDFC6 \uCD5C\uC885 \uC21C\uC704 \uC2DC\uC0C1 \uD83C\uDFC6"), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83C\uDFC6 \uCD5C\uC885 \uC21C\uC704 \uC2DC\uC0C1 \uD83C\uDFC6"), !revealed && /*#__PURE__*/React.createElement("div", {
+    className: "awards-suspense"
+  }, "\uB450\uAD6C\uB450\uAD6C\uB450\uAD6C... \uACE7 \uBC1C\uD45C\uB429\uB2C8\uB2E4!"), /*#__PURE__*/React.createElement("div", {
     className: "awards-podium"
   }, order.map(rankIdx => {
     const t = top4[rankIdx];
@@ -1644,13 +1653,15 @@ function AwardsCeremonyView({
       key: t.id
     }, /*#__PURE__*/React.createElement("div", {
       className: "podium-team"
-    }, /*#__PURE__*/React.createElement(TeamChip, {
+    }, revealed ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(TeamChip, {
       team: t,
       size: rankIdx === 0 ? "big" : undefined,
       champion: rankIdx === 0
     }), /*#__PURE__*/React.createElement("div", {
       className: "podium-score"
-    }, t.total, "\uC810")), /*#__PURE__*/React.createElement("div", {
+    }, t.total, "\uC810")) : /*#__PURE__*/React.createElement("div", {
+      className: "podium-mystery" + (rankIdx === 0 ? " big" : "")
+    }, "?")), /*#__PURE__*/React.createElement("div", {
       className: "podium-pedestal"
     }, /*#__PURE__*/React.createElement("span", {
       className: "podium-num"
@@ -2386,10 +2397,16 @@ function ControlTab({
   const setActive = key => update(s => {
     s.display.activeDayKey = key;
     s.display.showAwards = false;
+    s.display.awardsRevealed = false;
     return s;
   });
   const showAwards = () => update(s => {
     s.display.showAwards = true;
+    s.display.awardsRevealed = false;
+    return s;
+  });
+  const revealAwards = () => update(s => {
+    s.display.awardsRevealed = true;
     return s;
   });
   const resetAll = () => {
@@ -2491,7 +2508,23 @@ function ControlTab({
   }, d.label, " \xB7 ", d.game)), /*#__PURE__*/React.createElement("button", {
     className: "tab-btn" + (state.display.showAwards ? " active" : ""),
     onClick: showAwards
-  }, "\uD83C\uDFC6 \uCD5C\uC885 \uC2DC\uC0C1\uC2DD")), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83C\uDFC6 \uCD5C\uC885 \uC2DC\uC0C1\uC2DD")), state.display.showAwards && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      paddingTop: 14,
+      borderTop: "1px dashed var(--line)"
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: "var(--sub)",
+      fontSize: 12,
+      marginBottom: 8
+    }
+  }, "\uC2DC\uC0C1\uC2DD \uD654\uBA74\uC740 \uC21C\uC704\uB97C \uAC00\uB9B0 \uCC44\uB85C \uBA3C\uC800 \uB739\uB2C8\uB2E4. \uC544\uB798 \uBC84\uD2BC\uC744 \uB204\uB974\uB294 \uC21C\uAC04 TV \uD654\uBA74\uC5D0 \uC21C\uC704\uAC00 \uACF5\uAC1C\uB429\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("button", {
+    className: "small-btn",
+    disabled: state.display.awardsRevealed,
+    onClick: revealAwards
+  }, state.display.awardsRevealed ? "✅ 발표 완료" : "📢 결과발표")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18,
       paddingTop: 16,

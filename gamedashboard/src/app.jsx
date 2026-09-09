@@ -139,7 +139,7 @@ function createDefaultState(){
       day3:{ execTeams:[] },
       day4:{ execTeams:[] },
     },
-    display:{ activeDayKey:"day1", showAwards:false, day3Timer:{ teamId:null, startedAt:null, stoppedAt:null } },
+    display:{ activeDayKey:"day1", showAwards:false, awardsRevealed:false, day3Timer:{ teamId:null, startedAt:null, stoppedAt:null } },
   };
 }
 function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
@@ -737,6 +737,7 @@ function AwardsCeremonyView({ state }){
   const overall = useMemo(()=>computeOverall(state),[state]);
   const top4 = overall.slice(0,4);
   const order = [1,0,2,3]; // drawn left-to-right: 2nd, 1st, 3rd, 4th — classic podium order
+  const revealed = !!state.display.awardsRevealed;
   return (
     <div>
       <div className="topbar">
@@ -748,6 +749,7 @@ function AwardsCeremonyView({ state }){
       </div>
       <div className="awards-podium-wrap">
         <div className="awards-podium-title">🏆 최종 순위 시상 🏆</div>
+        {!revealed && <div className="awards-suspense">두구두구두구... 곧 발표됩니다!</div>}
         <div className="awards-podium">
           {order.map(rankIdx=>{
             const t = top4[rankIdx];
@@ -755,8 +757,14 @@ function AwardsCeremonyView({ state }){
             return (
               <div className={"podium-block podium-r" + (rankIdx+1)} key={t.id}>
                 <div className="podium-team">
-                  <TeamChip team={t} size={rankIdx===0?"big":undefined} champion={rankIdx===0} />
-                  <div className="podium-score">{t.total}점</div>
+                  {revealed ? (
+                    <>
+                      <TeamChip team={t} size={rankIdx===0?"big":undefined} champion={rankIdx===0} />
+                      <div className="podium-score">{t.total}점</div>
+                    </>
+                  ) : (
+                    <div className={"podium-mystery" + (rankIdx===0?" big":"")}>?</div>
+                  )}
                 </div>
                 <div className="podium-pedestal"><span className="podium-num">{rankIdx+1}</span></div>
               </div>
@@ -1246,8 +1254,9 @@ function RulesTab({ state }){
 
 /* ============================== admin: control tab ============================== */
 function ControlTab({ state, update }){
-  const setActive = (key)=> update(s=>{ s.display.activeDayKey = key; s.display.showAwards = false; return s; });
-  const showAwards = ()=> update(s=>{ s.display.showAwards = true; return s; });
+  const setActive = (key)=> update(s=>{ s.display.activeDayKey = key; s.display.showAwards = false; s.display.awardsRevealed = false; return s; });
+  const showAwards = ()=> update(s=>{ s.display.showAwards = true; s.display.awardsRevealed = false; return s; });
+  const revealAwards = ()=> update(s=>{ s.display.awardsRevealed = true; return s; });
   const resetAll = ()=>{
     if(!window.confirm("이 브라우저에 저장된 모든 데이터(팀 정보, 대진표, 순위, 배점 설정 등)를 지우고 초기 상태로 되돌립니다. 계속할까요?")) return;
     try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
@@ -1335,6 +1344,15 @@ function ControlTab({ state, update }){
           🏆 최종 시상식
         </button>
       </div>
+      {state.display.showAwards &&
+        <div style={{marginTop:14,paddingTop:14,borderTop:"1px dashed var(--line)"}}>
+          <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
+            시상식 화면은 순위를 가린 채로 먼저 뜹니다. 아래 버튼을 누르는 순간 TV 화면에 순위가 공개됩니다.
+          </p>
+          <button className="small-btn" disabled={state.display.awardsRevealed} onClick={revealAwards}>
+            {state.display.awardsRevealed ? "✅ 발표 완료" : "📢 결과발표"}
+          </button>
+        </div>}
       <div style={{marginTop:18,paddingTop:16,borderTop:"1px dashed var(--line)"}}>
         <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
           선택된 Day({activeDay.label} · {activeDay.game})의 결과로 포스터 제작용 프롬프트와 엑셀을 내려받습니다.
