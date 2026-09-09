@@ -134,7 +134,7 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .day3-timer-banner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:60px 20px;}
 .day3-timer-clock{font-size:180px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);
   text-shadow:0 0 30px rgba(255,209,102,.6);line-height:1;}
-.day3-timer-clock.finished{color:var(--green);text-shadow:0 0 36px rgba(61,220,132,.65);}
+.day3-timer-clock.finished{color:var(--red);text-shadow:0 0 36px rgba(255,92,92,.65);}
 .day3-timer-controls{display:flex;gap:24px;}
 .timer-start-btn-big,.timer-stop-btn-big{padding:16px 48px;font-size:28px;border-radius:14px;}
 .timer-start-btn-big{box-shadow:0 0 24px rgba(38,224,217,.5);}
@@ -1057,15 +1057,20 @@ function parseTimeInput(str) {
   const v = parseFloat(s);
   return isNaN(v) ? null : v;
 }
-// While startedAt is set, forces a re-render every 100ms so the caller can
-// recompute elapsed time fresh from Date.now() each tick (no drift, and
-// nothing is written to localStorage while this runs).
+// While startedAt is set, forces a re-render on every animation frame (in
+// step with the screen's own refresh, ~60/sec) so the displayed count-up
+// advances smoothly instead of visibly stepping in setInterval-sized
+// chunks. Still recomputes elapsed time fresh from Date.now() each tick
+// (no drift, and nothing is written to localStorage while this runs).
 function useElapsedSeconds(startedAt) {
   const [, forceTick] = useState(0);
   useEffect(() => {
     if (startedAt == null) return;
-    const id = setInterval(() => forceTick(x => x + 1), 100);
-    return () => clearInterval(id);
+    let raf = requestAnimationFrame(function tick() {
+      forceTick(x => x + 1);
+      raf = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(raf);
   }, [startedAt]);
   return startedAt == null ? null : (Date.now() - startedAt) / 1000;
 }

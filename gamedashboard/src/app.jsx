@@ -381,15 +381,20 @@ function parseTimeInput(str){
   const v = parseFloat(s);
   return isNaN(v) ? null : v;
 }
-// While startedAt is set, forces a re-render every 100ms so the caller can
-// recompute elapsed time fresh from Date.now() each tick (no drift, and
-// nothing is written to localStorage while this runs).
+// While startedAt is set, forces a re-render on every animation frame (in
+// step with the screen's own refresh, ~60/sec) so the displayed count-up
+// advances smoothly instead of visibly stepping in setInterval-sized
+// chunks. Still recomputes elapsed time fresh from Date.now() each tick
+// (no drift, and nothing is written to localStorage while this runs).
 function useElapsedSeconds(startedAt){
   const [, forceTick] = useState(0);
   useEffect(()=>{
     if(startedAt==null) return;
-    const id = setInterval(()=>forceTick(x=>x+1), 100);
-    return ()=>clearInterval(id);
+    let raf = requestAnimationFrame(function tick(){
+      forceTick(x=>x+1);
+      raf = requestAnimationFrame(tick);
+    });
+    return ()=>cancelAnimationFrame(raf);
   },[startedAt]);
   return startedAt==null ? null : (Date.now()-startedAt)/1000;
 }
