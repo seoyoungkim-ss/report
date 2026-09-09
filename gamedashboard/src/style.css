@@ -116,6 +116,22 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .rank-row.r1 .rank-num{color:var(--gold);font-size:28px;}
 .turn-badge{font-size:11px;font-weight:700;color:var(--sub);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;flex:none;white-space:nowrap;}
 
+/* ---------- final awards ceremony ---------- */
+.awards-view{display:flex;flex-direction:column;align-items:center;gap:32px;padding:40px 20px;}
+.awards-title{font-size:42px;font-weight:900;color:var(--gold);text-shadow:0 0 20px rgba(255,209,102,.5);}
+.awards-list{display:flex;flex-direction:column;gap:16px;width:100%;max-width:900px;}
+.awards-row{display:flex;align-items:center;gap:20px;padding:18px 28px;border-radius:16px;
+  background:linear-gradient(90deg,var(--panel),var(--panel2));border:2px solid var(--line);}
+.awards-medal{font-size:44px;line-height:1;flex:none;}
+.awards-rank-num{font-size:22px;font-weight:900;color:var(--sub);width:50px;flex:none;}
+.awards-score{margin-left:auto;font-size:32px;font-weight:900;color:var(--gold);flex:none;}
+.awards-row.r1{border-color:var(--gold);box-shadow:0 0 30px rgba(255,209,102,.4);padding:26px 32px;transform:scale(1.05);}
+.awards-row.r1 .awards-medal{font-size:60px;}
+.awards-row.r1 .awards-score{font-size:40px;}
+.awards-row.r2{border-color:#c9d3e0;}
+.awards-row.r3{border-color:#e0a672;}
+.awards-row.r4{border-color:var(--cyan);}
+
 /* ---------- day3 live timer (operated directly on the TV screen so
    everyone watching sees the exact start/stop moment) ---------- */
 .timer-start-btn,.timer-stop-btn{border:none;border-radius:8px;padding:8px 18px;font-weight:800;font-size:15px;cursor:pointer;flex:none;}

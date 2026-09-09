@@ -124,6 +124,22 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .rank-row.r1 .rank-num{color:var(--gold);font-size:28px;}
 .turn-badge{font-size:11px;font-weight:700;color:var(--sub);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;flex:none;white-space:nowrap;}
 
+/* ---------- final awards ceremony ---------- */
+.awards-view{display:flex;flex-direction:column;align-items:center;gap:32px;padding:40px 20px;}
+.awards-title{font-size:42px;font-weight:900;color:var(--gold);text-shadow:0 0 20px rgba(255,209,102,.5);}
+.awards-list{display:flex;flex-direction:column;gap:16px;width:100%;max-width:900px;}
+.awards-row{display:flex;align-items:center;gap:20px;padding:18px 28px;border-radius:16px;
+  background:linear-gradient(90deg,var(--panel),var(--panel2));border:2px solid var(--line);}
+.awards-medal{font-size:44px;line-height:1;flex:none;}
+.awards-rank-num{font-size:22px;font-weight:900;color:var(--sub);width:50px;flex:none;}
+.awards-score{margin-left:auto;font-size:32px;font-weight:900;color:var(--gold);flex:none;}
+.awards-row.r1{border-color:var(--gold);box-shadow:0 0 30px rgba(255,209,102,.4);padding:26px 32px;transform:scale(1.05);}
+.awards-row.r1 .awards-medal{font-size:60px;}
+.awards-row.r1 .awards-score{font-size:40px;}
+.awards-row.r2{border-color:#c9d3e0;}
+.awards-row.r3{border-color:#e0a672;}
+.awards-row.r4{border-color:var(--cyan);}
+
 /* ---------- day3 live timer (operated directly on the TV screen so
    everyone watching sees the exact start/stop moment) ---------- */
 .timer-start-btn,.timer-stop-btn{border:none;border-radius:8px;padding:8px 18px;font-weight:800;font-size:15px;cursor:pointer;flex:none;}
@@ -608,8 +624,9 @@ const DAYS = [{
   date: "9/10(목)",
   game: "실내 컬링",
   place: "본관동 로비",
-  unit: "4인 1팀",
-  format: "bracket"
+  unit: "4인 1팀 · 3판 2선승",
+  format: "bracket",
+  hasSetScore: true
 }];
 const dayInfo = k => DAYS.find(d => d.key === k);
 const STORAGE_KEY = "summer-escape-state-v1";
@@ -793,6 +810,7 @@ function createDefaultState() {
     },
     display: {
       activeDayKey: "day1",
+      showAwards: false,
       day3Timer: {
         teamId: null,
         startedAt: null,
@@ -1589,6 +1607,49 @@ function Day3TimerBanner({
   }, "\u25A0 \uC885\uB8CC")));
 }
 
+/* Final ceremony screen — cumulative TOP4 by computeOverall(), independent
+   of activeDayKey so it never has to pretend to be a "day". */
+function AwardsCeremonyView({
+  state
+}) {
+  const overall = useMemo(() => computeOverall(state), [state]);
+  const top4 = overall.slice(0, 4);
+  const medal = ["🥇", "🥈", "🥉", "🎖️"];
+  const rankClass = ["r1", "r2", "r3", "r4"];
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "topbar"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "brand"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "emoji"
+  }, "\uD83C\uDFDD\uFE0F"), /*#__PURE__*/React.createElement("h1", null, "\uC378\uBA38\uD0C8\uCD9C \uD398\uC2A4\uD2F0\uBC8C")), /*#__PURE__*/React.createElement("div", {
+    className: "daybadge"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "tag"
+  }, "FINAL"), /*#__PURE__*/React.createElement("span", {
+    className: "game"
+  }, "\uCD5C\uC885 \uC2DC\uC0C1\uC2DD"))), /*#__PURE__*/React.createElement("div", {
+    className: "awards-view"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "awards-title"
+  }, "\uD83C\uDFC6 \uCD5C\uC885 \uC21C\uC704 \uC2DC\uC0C1 \uD83C\uDFC6"), /*#__PURE__*/React.createElement("div", {
+    className: "awards-list"
+  }, top4.map((t, idx) => /*#__PURE__*/React.createElement("div", {
+    className: "awards-row " + rankClass[idx],
+    key: t.id
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "awards-medal"
+  }, medal[idx]), /*#__PURE__*/React.createElement("span", {
+    className: "awards-rank-num"
+  }, idx + 1, "\uC704"), /*#__PURE__*/React.createElement(TeamChip, {
+    team: t,
+    size: idx === 0 ? "big" : undefined,
+    champion: idx === 0
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "awards-score"
+  }, t.total, "\uC810"))))));
+}
+
 /* ============================== display view ============================== */
 function DisplayView({
   state,
@@ -2316,6 +2377,11 @@ function ControlTab({
 }) {
   const setActive = key => update(s => {
     s.display.activeDayKey = key;
+    s.display.showAwards = false;
+    return s;
+  });
+  const showAwards = () => update(s => {
+    s.display.showAwards = true;
     return s;
   });
   const resetAll = () => {
@@ -2412,9 +2478,12 @@ function ControlTab({
     }
   }, DAYS.map(d => /*#__PURE__*/React.createElement("button", {
     key: d.key,
-    className: "tab-btn" + (state.display.activeDayKey === d.key ? " active" : ""),
+    className: "tab-btn" + (state.display.activeDayKey === d.key && !state.display.showAwards ? " active" : ""),
     onClick: () => setActive(d.key)
-  }, d.label, " \xB7 ", d.game))), /*#__PURE__*/React.createElement("div", {
+  }, d.label, " \xB7 ", d.game)), /*#__PURE__*/React.createElement("button", {
+    className: "tab-btn" + (state.display.showAwards ? " active" : ""),
+    onClick: showAwards
+  }, "\uD83C\uDFC6 \uCD5C\uC885 \uC2DC\uC0C1\uC2DD")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 18,
       paddingTop: 16,
@@ -2654,7 +2723,7 @@ function App() {
   const day3TimerRunning = !!(state && state.display.day3Timer && state.display.day3Timer.teamId);
   // hide the decorative game illustration while a Day3 timer is running so
   // it doesn't clutter/overlap the big on-screen clock
-  const heroGames = mode === "display" && state && !day3TimerRunning ? DAY_ILLUSTRATIONS[state.display.activeDayKey] || [] : [];
+  const heroGames = mode === "display" && state && !day3TimerRunning && !state.display.showAwards ? DAY_ILLUSTRATIONS[state.display.activeDayKey] || [] : [];
   // bracket days now use the full canvas bottom-to-top, so the illustration
   // moves up beside the final-round box (a narrower gap) instead of sitting
   // at the bottom, and needs to be a bit smaller to fit there
@@ -2727,7 +2796,9 @@ function App() {
     }, /*#__PURE__*/React.createElement(Illust, {
       size: heroSize
     }));
-  })), /*#__PURE__*/React.createElement(DisplayView, {
+  })), state.display.showAwards ? /*#__PURE__*/React.createElement(AwardsCeremonyView, {
+    state: state
+  }) : /*#__PURE__*/React.createElement(DisplayView, {
     state: state,
     update: update
   }))) : /*#__PURE__*/React.createElement(AdminView, {

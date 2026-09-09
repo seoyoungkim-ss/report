@@ -6,7 +6,7 @@ const DAYS = [
   { key:"day1", label:"DAY 1", date:"9/7(월)", game:"자이언트 젠가", place:"본관동 로비", unit:"3인 1팀", format:"bracket", hasFirstMover:true },
   { key:"day2", label:"DAY 2", date:"9/8(화)", game:"모바일 카트라이더", place:"본관동 대강당", unit:"4vs4 팀전 · 3판 2선승", format:"bracket", hasSetScore:true },
   { key:"day3", label:"DAY 3", date:"9/9(수)", game:"팀빌딩 게임", place:"잔디광장", unit:"6인 1팀", format:"ranking" },
-  { key:"day4", label:"DAY 4", date:"9/10(목)", game:"실내 컬링", place:"본관동 로비", unit:"4인 1팀", format:"bracket" },
+  { key:"day4", label:"DAY 4", date:"9/10(목)", game:"실내 컬링", place:"본관동 로비", unit:"4인 1팀 · 3판 2선승", format:"bracket", hasSetScore:true },
 ];
 const dayInfo = (k) => DAYS.find(d=>d.key===k);
 const STORAGE_KEY = "summer-escape-state-v1";
@@ -139,7 +139,7 @@ function createDefaultState(){
       day3:{ execTeams:[] },
       day4:{ execTeams:[] },
     },
-    display:{ activeDayKey:"day1", day3Timer:{ teamId:null, startedAt:null, stoppedAt:null } },
+    display:{ activeDayKey:"day1", showAwards:false, day3Timer:{ teamId:null, startedAt:null, stoppedAt:null } },
   };
 }
 function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
@@ -731,6 +731,39 @@ function Day3TimerBanner({ team, startedAt, stoppedAt, onStart, onEnd, onConfirm
   );
 }
 
+/* Final ceremony screen — cumulative TOP4 by computeOverall(), independent
+   of activeDayKey so it never has to pretend to be a "day". */
+function AwardsCeremonyView({ state }){
+  const overall = useMemo(()=>computeOverall(state),[state]);
+  const top4 = overall.slice(0,4);
+  const medal = ["🥇","🥈","🥉","🎖️"];
+  const rankClass = ["r1","r2","r3","r4"];
+  return (
+    <div>
+      <div className="topbar">
+        <div className="brand"><span className="emoji">🏝️</span><h1>썸머탈출 페스티벌</h1></div>
+        <div className="daybadge">
+          <span className="tag">FINAL</span>
+          <span className="game">최종 시상식</span>
+        </div>
+      </div>
+      <div className="awards-view">
+        <div className="awards-title">🏆 최종 순위 시상 🏆</div>
+        <div className="awards-list">
+          {top4.map((t,idx)=>(
+            <div className={"awards-row " + rankClass[idx]} key={t.id}>
+              <span className="awards-medal">{medal[idx]}</span>
+              <span className="awards-rank-num">{idx+1}위</span>
+              <TeamChip team={t} size={idx===0?"big":undefined} champion={idx===0} />
+              <span className="awards-score">{t.total}점</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ============================== display view ============================== */
 function DisplayView({ state, update }){
   const teamsById = useMemo(()=>Object.fromEntries(state.teams.map(t=>[t.id,t])),[state.teams]);
@@ -1209,7 +1242,8 @@ function RulesTab({ state }){
 
 /* ============================== admin: control tab ============================== */
 function ControlTab({ state, update }){
-  const setActive = (key)=> update(s=>{ s.display.activeDayKey = key; return s; });
+  const setActive = (key)=> update(s=>{ s.display.activeDayKey = key; s.display.showAwards = false; return s; });
+  const showAwards = ()=> update(s=>{ s.display.showAwards = true; return s; });
   const resetAll = ()=>{
     if(!window.confirm("이 브라우저에 저장된 모든 데이터(팀 정보, 대진표, 순위, 배점 설정 등)를 지우고 초기 상태로 되돌립니다. 계속할까요?")) return;
     try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
@@ -1289,10 +1323,13 @@ function ControlTab({ state, update }){
       <p style={{color:"var(--sub)",fontSize:13}}>TV/플립 화면에 표시할 오늘의 경기를 선택하세요.</p>
       <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
         {DAYS.map(d=>(
-          <button key={d.key} className={"tab-btn" + (state.display.activeDayKey===d.key?" active":"")} onClick={()=>setActive(d.key)}>
+          <button key={d.key} className={"tab-btn" + (state.display.activeDayKey===d.key && !state.display.showAwards?" active":"")} onClick={()=>setActive(d.key)}>
             {d.label} · {d.game}
           </button>
         ))}
+        <button className={"tab-btn" + (state.display.showAwards?" active":"")} onClick={showAwards}>
+          🏆 최종 시상식
+        </button>
       </div>
       <div style={{marginTop:18,paddingTop:16,borderTop:"1px dashed var(--line)"}}>
         <p style={{color:"var(--sub)",fontSize:12,marginBottom:8}}>
@@ -1417,7 +1454,7 @@ function App(){
   const day3TimerRunning = !!(state && state.display.day3Timer && state.display.day3Timer.teamId);
   // hide the decorative game illustration while a Day3 timer is running so
   // it doesn't clutter/overlap the big on-screen clock
-  const heroGames = (mode==="display" && state && !day3TimerRunning) ? (DAY_ILLUSTRATIONS[state.display.activeDayKey] || []) : [];
+  const heroGames = (mode==="display" && state && !day3TimerRunning && !state.display.showAwards) ? (DAY_ILLUSTRATIONS[state.display.activeDayKey] || []) : [];
   // bracket days now use the full canvas bottom-to-top, so the illustration
   // moves up beside the final-round box (a narrower gap) instead of sitting
   // at the bottom, and needs to be a bit smaller to fit there
@@ -1457,7 +1494,9 @@ function App(){
                   );
                 })}
               </div>}
-              <DisplayView state={state} update={update} />
+              {state.display.showAwards
+                ? <AwardsCeremonyView state={state} />
+                : <DisplayView state={state} update={update} />}
             </div>
           </div>
         ) : <AdminView state={state} update={update} />}
