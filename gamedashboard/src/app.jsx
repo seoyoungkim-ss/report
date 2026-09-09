@@ -665,7 +665,7 @@ function BracketBoard({ bracket, teamsById, editable, onSetWinner, onResetWinner
 }
 
 /* ============================== ranking board ============================== */
-function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime }){
+function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime, onStartTimer }){
   const ranked = getRankedEntries(day3).slice().sort((a,b)=>{
     if(a.rank==null) return 1; if(b.rank==null) return -1; return a.rank-b.rank;
   });
@@ -681,6 +681,8 @@ function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime }){
             <div className="rank-num">{e.rank || "-"}</div>
             <span className="turn-badge" title="진행순서">{turnOrder[e.teamId]}번째 진행</span>
             <TeamChip team={t} exec={execTeamIds && execTeamIds.includes(e.teamId)} champion={e.rank===1} />
+            {onStartTimer &&
+              <button className="timer-start-btn" onClick={()=>onStartTimer(e.teamId)}>▶ 시작</button>}
             {showTimeInput ? (
               <input type="text" className="rank-time-input" placeholder="mm:ss" key={e.timeSec}
                 defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}
@@ -696,13 +698,16 @@ function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime }){
   );
 }
 /* Full-screen "on air" timer for the team currently running Day3's course —
-   shown on the TV screen instead of the ranking list while a timer is live. */
-function Day3TimerBanner({ team, startedAt }){
+   shown on the TV screen instead of the ranking list while a timer is live.
+   Start/stop is operated right here (not from the admin tab) so everyone
+   watching the screen sees the exact moment it starts and stops. */
+function Day3TimerBanner({ team, startedAt, onStop }){
   const elapsed = useElapsedSeconds(startedAt);
   return (
     <div className="day3-timer-banner">
       <TeamChip team={team} size="big" />
       <div className="day3-timer-clock">{fmtTime(elapsed)}</div>
+      <button className="timer-stop-btn timer-stop-btn-big" onClick={onStop}>■ 정지</button>
     </div>
   );
 }
@@ -721,6 +726,18 @@ function DisplayView({ state, update }){
     return s;
   });
   const day3Timer = state.display.day3Timer || { teamId:null, startedAt:null };
+  const startDay3Timer = (teamId)=> update(s=>{
+    s.display.day3Timer = { teamId, startedAt: Date.now() };
+    return s;
+  });
+  const stopDay3Timer = ()=> update(s=>{
+    const t = s.display.day3Timer;
+    if(!t || !t.teamId) return null;
+    const e = s.days.day3.entries.find(x=>x.teamId===t.teamId);
+    if(e) e.timeSec = (Date.now()-t.startedAt)/1000;
+    s.display.day3Timer = { teamId:null, startedAt:null };
+    return s;
+  });
 
   return (
     <div>
@@ -775,8 +792,9 @@ function DisplayView({ state, update }){
           {info.format==="bracket"
             ? <InteractiveBracketSection dayKey={activeKey} state={state} update={update} teamsById={teamsById} />
             : (day3Timer.teamId
-                ? <Day3TimerBanner team={teamsById[day3Timer.teamId]} startedAt={day3Timer.startedAt} />
-                : <RankingBoard day3={state.days.day3} teamsById={teamsById} execTeamIds={execTeamIds} editable={true} onSetTime={setDay3Time} />)}
+                ? <Day3TimerBanner team={teamsById[day3Timer.teamId]} startedAt={day3Timer.startedAt} onStop={stopDay3Timer} />
+                : <RankingBoard day3={state.days.day3} teamsById={teamsById} execTeamIds={execTeamIds} editable={true}
+                    onSetTime={setDay3Time} onStartTimer={startDay3Timer} />)}
         </div>
       </div>
     </div>
@@ -946,34 +964,6 @@ function SeedingEditor({ dayKey, bracket, teams, update }){
   );
 }
 
-/* Broken out from DayTab's day3 list so useElapsedSeconds (a hook) can be
-   called once per row — only the running team's row actually ticks. */
-function Day3EntryRow({ entry, team, exec, rank, turnOrder, entryCount, onSetTurnOrder, onSetTime,
-  timerRunning, timerStartedAt, anotherTimerRunning, onStartTimer, onStopTimer }){
-  const elapsed = useElapsedSeconds(timerStartedAt);
-  return (
-    <div className="rank-edit-row">
-      <select value={turnOrder} style={{width:90}}
-        onChange={(ev)=>onSetTurnOrder(parseInt(ev.target.value,10))}>
-        {Array.from({length:entryCount},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}번째</option>)}
-      </select>
-      <div style={{width:30,textAlign:"center",fontWeight:900,color:"var(--gold)"}}>{rank||"-"}</div>
-      <TeamChip team={team} exec={exec} champion={rank===1} />
-      {timerRunning ? (
-        <>
-          <span className="timer-live-clock">{fmtTime(elapsed)}</span>
-          <button className="timer-stop-btn" onClick={onStopTimer}>■ 정지</button>
-        </>
-      ) : (
-        <button className="timer-start-btn" disabled={anotherTimerRunning} onClick={onStartTimer}>▶ 시작</button>
-      )}
-      <input type="text" style={{marginLeft:"auto",width:100}} placeholder="mm:ss"
-        key={entry.timeSec} defaultValue={entry.timeSec!=null?fmtTime(entry.timeSec):""}
-        onBlur={(ev)=>onSetTime(ev.target.value)} />
-    </div>
-  );
-}
-
 /* ============================== admin: day tab ============================== */
 function DayTab({ dayKey, state, update, teamsById }){
   const info = dayInfo(dayKey);
@@ -1015,19 +1005,6 @@ function DayTab({ dayKey, state, update, teamsById }){
   const ranked = getRankedEntries(dayState);
   const rankOf = Object.fromEntries(ranked.map(e=>[e.teamId,e.rank]));
   const turnOrder = turnOrderOf(dayState);
-  const timer = state.display.day3Timer || { teamId:null, startedAt:null };
-  const startTimer = (teamId)=> update(s=>{
-    s.display.day3Timer = { teamId, startedAt: Date.now() };
-    return s;
-  });
-  const stopTimer = ()=> update(s=>{
-    const t = s.display.day3Timer;
-    if(!t || !t.teamId) return null;
-    const e = s.days.day3.entries.find(x=>x.teamId===t.teamId);
-    if(e) e.timeSec = (Date.now()-t.startedAt)/1000;
-    s.display.day3Timer = { teamId:null, startedAt:null };
-    return s;
-  });
 
   return (
     <div className="card">
@@ -1037,18 +1014,25 @@ function DayTab({ dayKey, state, update, teamsById }){
       </div>
       <p style={{color:"var(--sub)",fontSize:12,marginTop:-6,marginBottom:12}}>
         진행순서는 팀빌딩 코스를 도는 순서(현장 대기열)이고, 순위는 완료 시간으로 자동 계산됩니다 — 서로 영향을 주지 않습니다.
-        "시작"을 누르면 TV 송출 화면에 그 팀의 타이머가 크게 표시되고, "정지"를 누르면 그 시간이 자동으로 기록됩니다.
+        타이머 시작/정지는 TV 송출 화면에서 직접 조작합니다 — 여기서는 필요할 때 시간을 수동으로 고칠 수만 있습니다.
       </p>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {entries.map((e)=>(
-          <Day3EntryRow key={e.teamId} entry={e} team={teamsById[e.teamId]}
-            exec={execTeamIds.includes(e.teamId)} rank={rankOf[e.teamId]}
-            turnOrder={turnOrder[e.teamId]} entryCount={entries.length}
-            onSetTurnOrder={(n)=>setTurnOrder(e.teamId, n)} onSetTime={(v)=>setTime(e.teamId, v)}
-            timerRunning={timer.teamId===e.teamId} timerStartedAt={timer.teamId===e.teamId ? timer.startedAt : null}
-            anotherTimerRunning={!!timer.teamId && timer.teamId!==e.teamId}
-            onStartTimer={()=>startTimer(e.teamId)} onStopTimer={stopTimer} />
-        ))}
+        {entries.map((e)=>{
+          const t = teamsById[e.teamId];
+          return (
+            <div className="rank-edit-row" key={e.teamId}>
+              <select value={turnOrder[e.teamId]} style={{width:90}}
+                onChange={(ev)=>setTurnOrder(e.teamId, parseInt(ev.target.value,10))}>
+                {entries.map((_,i)=><option key={i} value={i+1}>{i+1}번째</option>)}
+              </select>
+              <div style={{width:30,textAlign:"center",fontWeight:900,color:"var(--gold)"}}>{rankOf[e.teamId]||"-"}</div>
+              <TeamChip team={t} exec={execTeamIds.includes(e.teamId)} champion={rankOf[e.teamId]===1} />
+              <input type="text" style={{marginLeft:"auto",width:100}} placeholder="mm:ss" key={e.timeSec}
+                defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}
+                onBlur={(ev)=>setTime(e.teamId, ev.target.value)} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1389,7 +1373,10 @@ function App(){
   const viewportRef = useRef(null);
   const scale = useFitScale(stageRef, viewportRef);
 
-  const heroGames = (mode==="display" && state) ? (DAY_ILLUSTRATIONS[state.display.activeDayKey] || []) : [];
+  const day3TimerRunning = !!(state && state.display.day3Timer && state.display.day3Timer.teamId);
+  // hide the decorative game illustration while a Day3 timer is running so
+  // it doesn't clutter/overlap the big on-screen clock
+  const heroGames = (mode==="display" && state && !day3TimerRunning) ? (DAY_ILLUSTRATIONS[state.display.activeDayKey] || []) : [];
   // bracket days now use the full canvas bottom-to-top, so the illustration
   // moves up beside the final-round box (a narrower gap) instead of sitting
   // at the bottom, and needs to be a bit smaller to fit there

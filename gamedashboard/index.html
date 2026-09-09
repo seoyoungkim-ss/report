@@ -41,7 +41,7 @@ body{margin:0;background:var(--bg);color:var(--text);}
 .fest-palm-r{right:-26px;}
 .fest-wave{position:absolute;left:0;right:0;bottom:0;width:100%;height:110px;}
 /* today's game illustration(s) — flat, no backdrop/caption, scattered for a dynamic collage feel */
-.fest-hero{position:absolute;max-width:40%;display:flex;align-items:center;}
+.fest-hero{position:absolute;max-width:40%;display:flex;align-items:center;pointer-events:none;}
 /* ranking day (Day3): the list is short, so the bottom stays clear */
 .fest-hero-bottom{bottom:140px;right:11%;}
 /* bracket days: sits in the empty margin to the right of the bracket
@@ -124,15 +124,16 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .rank-row.r1 .rank-num{color:var(--gold);font-size:28px;}
 .turn-badge{font-size:11px;font-weight:700;color:var(--sub);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;flex:none;white-space:nowrap;}
 
-/* ---------- day3 live timer ---------- */
-.timer-start-btn,.timer-stop-btn{border:none;border-radius:8px;padding:6px 14px;font-weight:800;font-size:13px;cursor:pointer;flex:none;}
-.timer-start-btn{background:var(--cyan);color:#04202a;}
+/* ---------- day3 live timer (operated directly on the TV screen so
+   everyone watching sees the exact start/stop moment) ---------- */
+.timer-start-btn,.timer-stop-btn{border:none;border-radius:8px;padding:8px 18px;font-weight:800;font-size:15px;cursor:pointer;flex:none;}
+.timer-start-btn{background:var(--cyan);color:#04202a;margin-left:auto;}
 .timer-start-btn:disabled{opacity:.35;cursor:default;}
 .timer-stop-btn{background:var(--red);color:#fff;}
-.timer-live-clock{font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);margin-left:8px;flex:none;}
 .day3-timer-banner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:60px 20px;}
 .day3-timer-clock{font-size:180px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);
   text-shadow:0 0 30px rgba(255,209,102,.6);line-height:1;}
+.timer-stop-btn-big{padding:16px 48px;font-size:28px;border-radius:14px;box-shadow:0 0 24px rgba(255,92,92,.5);}
 .rank-time{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--sub);font-weight:700;}
 .rank-time-input{margin-left:auto;width:110px;text-align:right;font-variant-numeric:tabular-nums;
   background:#081a34;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700;}
@@ -1490,7 +1491,8 @@ function RankingBoard({
   teamsById,
   execTeamIds,
   editable,
-  onSetTime
+  onSetTime,
+  onStartTimer
 }) {
   const ranked = getRankedEntries(day3).slice().sort((a, b) => {
     if (a.rank == null) return 1;
@@ -1516,7 +1518,10 @@ function RankingBoard({
       team: t,
       exec: execTeamIds && execTeamIds.includes(e.teamId),
       champion: e.rank === 1
-    }), showTimeInput ? /*#__PURE__*/React.createElement("input", {
+    }), onStartTimer && /*#__PURE__*/React.createElement("button", {
+      className: "timer-start-btn",
+      onClick: () => onStartTimer(e.teamId)
+    }, "\u25B6 \uC2DC\uC791"), showTimeInput ? /*#__PURE__*/React.createElement("input", {
       type: "text",
       className: "rank-time-input",
       placeholder: "mm:ss",
@@ -1530,10 +1535,13 @@ function RankingBoard({
   }));
 }
 /* Full-screen "on air" timer for the team currently running Day3's course —
-   shown on the TV screen instead of the ranking list while a timer is live. */
+   shown on the TV screen instead of the ranking list while a timer is live.
+   Start/stop is operated right here (not from the admin tab) so everyone
+   watching the screen sees the exact moment it starts and stops. */
 function Day3TimerBanner({
   team,
-  startedAt
+  startedAt,
+  onStop
 }) {
   const elapsed = useElapsedSeconds(startedAt);
   return /*#__PURE__*/React.createElement("div", {
@@ -1543,7 +1551,10 @@ function Day3TimerBanner({
     size: "big"
   }), /*#__PURE__*/React.createElement("div", {
     className: "day3-timer-clock"
-  }, fmtTime(elapsed)));
+  }, fmtTime(elapsed)), /*#__PURE__*/React.createElement("button", {
+    className: "timer-stop-btn timer-stop-btn-big",
+    onClick: onStop
+  }, "\u25A0 \uC815\uC9C0"));
 }
 
 /* ============================== display view ============================== */
@@ -1566,6 +1577,24 @@ function DisplayView({
     teamId: null,
     startedAt: null
   };
+  const startDay3Timer = teamId => update(s => {
+    s.display.day3Timer = {
+      teamId,
+      startedAt: Date.now()
+    };
+    return s;
+  });
+  const stopDay3Timer = () => update(s => {
+    const t = s.display.day3Timer;
+    if (!t || !t.teamId) return null;
+    const e = s.days.day3.entries.find(x => x.teamId === t.teamId);
+    if (e) e.timeSec = (Date.now() - t.startedAt) / 1000;
+    s.display.day3Timer = {
+      teamId: null,
+      startedAt: null
+    };
+    return s;
+  });
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1654,13 +1683,15 @@ function DisplayView({
     teamsById: teamsById
   }) : day3Timer.teamId ? /*#__PURE__*/React.createElement(Day3TimerBanner, {
     team: teamsById[day3Timer.teamId],
-    startedAt: day3Timer.startedAt
+    startedAt: day3Timer.startedAt,
+    onStop: stopDay3Timer
   }) : /*#__PURE__*/React.createElement(RankingBoard, {
     day3: state.days.day3,
     teamsById: teamsById,
     execTeamIds: execTeamIds,
     editable: true,
-    onSetTime: setDay3Time
+    onSetTime: setDay3Time,
+    onStartTimer: startDay3Timer
   }))));
 }
 
@@ -1899,70 +1930,6 @@ function SeedingEditor({
   }, t.name)))))));
 }
 
-/* Broken out from DayTab's day3 list so useElapsedSeconds (a hook) can be
-   called once per row — only the running team's row actually ticks. */
-function Day3EntryRow({
-  entry,
-  team,
-  exec,
-  rank,
-  turnOrder,
-  entryCount,
-  onSetTurnOrder,
-  onSetTime,
-  timerRunning,
-  timerStartedAt,
-  anotherTimerRunning,
-  onStartTimer,
-  onStopTimer
-}) {
-  const elapsed = useElapsedSeconds(timerStartedAt);
-  return /*#__PURE__*/React.createElement("div", {
-    className: "rank-edit-row"
-  }, /*#__PURE__*/React.createElement("select", {
-    value: turnOrder,
-    style: {
-      width: 90
-    },
-    onChange: ev => onSetTurnOrder(parseInt(ev.target.value, 10))
-  }, Array.from({
-    length: entryCount
-  }, (_, i) => i + 1).map(n => /*#__PURE__*/React.createElement("option", {
-    key: n,
-    value: n
-  }, n, "\uBC88\uC9F8"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 30,
-      textAlign: "center",
-      fontWeight: 900,
-      color: "var(--gold)"
-    }
-  }, rank || "-"), /*#__PURE__*/React.createElement(TeamChip, {
-    team: team,
-    exec: exec,
-    champion: rank === 1
-  }), timerRunning ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
-    className: "timer-live-clock"
-  }, fmtTime(elapsed)), /*#__PURE__*/React.createElement("button", {
-    className: "timer-stop-btn",
-    onClick: onStopTimer
-  }, "\u25A0 \uC815\uC9C0")) : /*#__PURE__*/React.createElement("button", {
-    className: "timer-start-btn",
-    disabled: anotherTimerRunning,
-    onClick: onStartTimer
-  }, "\u25B6 \uC2DC\uC791"), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    style: {
-      marginLeft: "auto",
-      width: 100
-    },
-    placeholder: "mm:ss",
-    key: entry.timeSec,
-    defaultValue: entry.timeSec != null ? fmtTime(entry.timeSec) : "",
-    onBlur: ev => onSetTime(ev.target.value)
-  }));
-}
-
 /* ============================== admin: day tab ============================== */
 function DayTab({
   dayKey,
@@ -2015,28 +1982,6 @@ function DayTab({
   const ranked = getRankedEntries(dayState);
   const rankOf = Object.fromEntries(ranked.map(e => [e.teamId, e.rank]));
   const turnOrder = turnOrderOf(dayState);
-  const timer = state.display.day3Timer || {
-    teamId: null,
-    startedAt: null
-  };
-  const startTimer = teamId => update(s => {
-    s.display.day3Timer = {
-      teamId,
-      startedAt: Date.now()
-    };
-    return s;
-  });
-  const stopTimer = () => update(s => {
-    const t = s.display.day3Timer;
-    if (!t || !t.teamId) return null;
-    const e = s.days.day3.entries.find(x => x.teamId === t.teamId);
-    if (e) e.timeSec = (Date.now() - t.startedAt) / 1000;
-    s.display.day3Timer = {
-      teamId: null,
-      startedAt: null
-    };
-    return s;
-  });
   return /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("div", {
@@ -2052,28 +1997,49 @@ function DayTab({
       marginTop: -6,
       marginBottom: 12
     }
-  }, "\uC9C4\uD589\uC21C\uC11C\uB294 \uD300\uBE4C\uB529 \uCF54\uC2A4\uB97C \uB3C4\uB294 \uC21C\uC11C(\uD604\uC7A5 \uB300\uAE30\uC5F4)\uC774\uACE0, \uC21C\uC704\uB294 \uC644\uB8CC \uC2DC\uAC04\uC73C\uB85C \uC790\uB3D9 \uACC4\uC0B0\uB429\uB2C8\uB2E4 \u2014 \uC11C\uB85C \uC601\uD5A5\uC744 \uC8FC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \"\uC2DC\uC791\"\uC744 \uB204\uB974\uBA74 TV \uC1A1\uCD9C \uD654\uBA74\uC5D0 \uADF8 \uD300\uC758 \uD0C0\uC774\uBA38\uAC00 \uD06C\uAC8C \uD45C\uC2DC\uB418\uACE0, \"\uC815\uC9C0\"\uB97C \uB204\uB974\uBA74 \uADF8 \uC2DC\uAC04\uC774 \uC790\uB3D9\uC73C\uB85C \uAE30\uB85D\uB429\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", {
+  }, "\uC9C4\uD589\uC21C\uC11C\uB294 \uD300\uBE4C\uB529 \uCF54\uC2A4\uB97C \uB3C4\uB294 \uC21C\uC11C(\uD604\uC7A5 \uB300\uAE30\uC5F4)\uC774\uACE0, \uC21C\uC704\uB294 \uC644\uB8CC \uC2DC\uAC04\uC73C\uB85C \uC790\uB3D9 \uACC4\uC0B0\uB429\uB2C8\uB2E4 \u2014 \uC11C\uB85C \uC601\uD5A5\uC744 \uC8FC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uD0C0\uC774\uBA38 \uC2DC\uC791/\uC815\uC9C0\uB294 TV \uC1A1\uCD9C \uD654\uBA74\uC5D0\uC11C \uC9C1\uC811 \uC870\uC791\uD569\uB2C8\uB2E4 \u2014 \uC5EC\uAE30\uC11C\uB294 \uD544\uC694\uD560 \uB54C \uC2DC\uAC04\uC744 \uC218\uB3D9\uC73C\uB85C \uACE0\uCE60 \uC218\uB9CC \uC788\uC2B5\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
       gap: 8
     }
-  }, entries.map(e => /*#__PURE__*/React.createElement(Day3EntryRow, {
-    key: e.teamId,
-    entry: e,
-    team: teamsById[e.teamId],
-    exec: execTeamIds.includes(e.teamId),
-    rank: rankOf[e.teamId],
-    turnOrder: turnOrder[e.teamId],
-    entryCount: entries.length,
-    onSetTurnOrder: n => setTurnOrder(e.teamId, n),
-    onSetTime: v => setTime(e.teamId, v),
-    timerRunning: timer.teamId === e.teamId,
-    timerStartedAt: timer.teamId === e.teamId ? timer.startedAt : null,
-    anotherTimerRunning: !!timer.teamId && timer.teamId !== e.teamId,
-    onStartTimer: () => startTimer(e.teamId),
-    onStopTimer: stopTimer
-  }))));
+  }, entries.map(e => {
+    const t = teamsById[e.teamId];
+    return /*#__PURE__*/React.createElement("div", {
+      className: "rank-edit-row",
+      key: e.teamId
+    }, /*#__PURE__*/React.createElement("select", {
+      value: turnOrder[e.teamId],
+      style: {
+        width: 90
+      },
+      onChange: ev => setTurnOrder(e.teamId, parseInt(ev.target.value, 10))
+    }, entries.map((_, i) => /*#__PURE__*/React.createElement("option", {
+      key: i,
+      value: i + 1
+    }, i + 1, "\uBC88\uC9F8"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 30,
+        textAlign: "center",
+        fontWeight: 900,
+        color: "var(--gold)"
+      }
+    }, rankOf[e.teamId] || "-"), /*#__PURE__*/React.createElement(TeamChip, {
+      team: t,
+      exec: execTeamIds.includes(e.teamId),
+      champion: rankOf[e.teamId] === 1
+    }), /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      style: {
+        marginLeft: "auto",
+        width: 100
+      },
+      placeholder: "mm:ss",
+      key: e.timeSec,
+      defaultValue: e.timeSec != null ? fmtTime(e.timeSec) : "",
+      onBlur: ev => setTime(e.teamId, ev.target.value)
+    }));
+  })));
 }
 
 /* ============================== admin: teams tab ============================== */
@@ -2614,7 +2580,10 @@ function App() {
   const stageRef = useRef(null);
   const viewportRef = useRef(null);
   const scale = useFitScale(stageRef, viewportRef);
-  const heroGames = mode === "display" && state ? DAY_ILLUSTRATIONS[state.display.activeDayKey] || [] : [];
+  const day3TimerRunning = !!(state && state.display.day3Timer && state.display.day3Timer.teamId);
+  // hide the decorative game illustration while a Day3 timer is running so
+  // it doesn't clutter/overlap the big on-screen clock
+  const heroGames = mode === "display" && state && !day3TimerRunning ? DAY_ILLUSTRATIONS[state.display.activeDayKey] || [] : [];
   // bracket days now use the full canvas bottom-to-top, so the illustration
   // moves up beside the final-round box (a narrower gap) instead of sitting
   // at the bottom, and needs to be a bit smaller to fit there
