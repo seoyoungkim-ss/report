@@ -123,6 +123,16 @@ svg.connectors path.decided{stroke:var(--cyan);stroke-width:4;filter:drop-shadow
 .rank-num{font-size:22px;font-weight:900;width:38px;text-align:center;color:var(--sub);}
 .rank-row.r1 .rank-num{color:var(--gold);font-size:28px;}
 .turn-badge{font-size:11px;font-weight:700;color:var(--sub);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;flex:none;white-space:nowrap;}
+
+/* ---------- day3 live timer ---------- */
+.timer-start-btn,.timer-stop-btn{border:none;border-radius:8px;padding:6px 14px;font-weight:800;font-size:13px;cursor:pointer;flex:none;}
+.timer-start-btn{background:var(--cyan);color:#04202a;}
+.timer-start-btn:disabled{opacity:.35;cursor:default;}
+.timer-stop-btn{background:var(--red);color:#fff;}
+.timer-live-clock{font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);margin-left:8px;flex:none;}
+.day3-timer-banner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:60px 20px;}
+.day3-timer-clock{font-size:180px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);
+  text-shadow:0 0 30px rgba(255,209,102,.6);line-height:1;}
 .rank-time{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--sub);font-weight:700;}
 .rank-time-input{margin-left:auto;width:110px;text-align:right;font-variant-numeric:tabular-nums;
   background:#081a34;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700;}
@@ -774,7 +784,11 @@ function createDefaultState() {
       }
     },
     display: {
-      activeDayKey: "day1"
+      activeDayKey: "day1",
+      day3Timer: {
+        teamId: null,
+        startedAt: null
+      }
     }
   };
 }
@@ -1033,6 +1047,18 @@ function parseTimeInput(str) {
   }
   const v = parseFloat(s);
   return isNaN(v) ? null : v;
+}
+// While startedAt is set, forces a re-render every 100ms so the caller can
+// recompute elapsed time fresh from Date.now() each tick (no drift, and
+// nothing is written to localStorage while this runs).
+function useElapsedSeconds(startedAt) {
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (startedAt == null) return;
+    const id = setInterval(() => forceTick(x => x + 1), 100);
+    return () => clearInterval(id);
+  }, [startedAt]);
+  return startedAt == null ? null : (Date.now() - startedAt) / 1000;
 }
 function compressImage(file, maxDim, quality) {
   return new Promise((resolve, reject) => {
@@ -1494,6 +1520,7 @@ function RankingBoard({
       type: "text",
       className: "rank-time-input",
       placeholder: "mm:ss",
+      key: e.timeSec,
       defaultValue: e.timeSec != null ? fmtTime(e.timeSec) : "",
       onClick: ev => ev.stopPropagation(),
       onBlur: ev => onSetTime(e.teamId, ev.target.value)
@@ -1501,6 +1528,22 @@ function RankingBoard({
       className: "rank-time"
     }, e.timeSec != null ? fmtTime(e.timeSec) : "미기록"));
   }));
+}
+/* Full-screen "on air" timer for the team currently running Day3's course —
+   shown on the TV screen instead of the ranking list while a timer is live. */
+function Day3TimerBanner({
+  team,
+  startedAt
+}) {
+  const elapsed = useElapsedSeconds(startedAt);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "day3-timer-banner"
+  }, /*#__PURE__*/React.createElement(TeamChip, {
+    team: team,
+    size: "big"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "day3-timer-clock"
+  }, fmtTime(elapsed)));
 }
 
 /* ============================== display view ============================== */
@@ -1519,6 +1562,10 @@ function DisplayView({
     e.timeSec = parseTimeInput(val);
     return s;
   });
+  const day3Timer = state.display.day3Timer || {
+    teamId: null,
+    startedAt: null
+  };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "topbar"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1605,6 +1652,9 @@ function DisplayView({
     state: state,
     update: update,
     teamsById: teamsById
+  }) : day3Timer.teamId ? /*#__PURE__*/React.createElement(Day3TimerBanner, {
+    team: teamsById[day3Timer.teamId],
+    startedAt: day3Timer.startedAt
   }) : /*#__PURE__*/React.createElement(RankingBoard, {
     day3: state.days.day3,
     teamsById: teamsById,
@@ -1849,6 +1899,70 @@ function SeedingEditor({
   }, t.name)))))));
 }
 
+/* Broken out from DayTab's day3 list so useElapsedSeconds (a hook) can be
+   called once per row — only the running team's row actually ticks. */
+function Day3EntryRow({
+  entry,
+  team,
+  exec,
+  rank,
+  turnOrder,
+  entryCount,
+  onSetTurnOrder,
+  onSetTime,
+  timerRunning,
+  timerStartedAt,
+  anotherTimerRunning,
+  onStartTimer,
+  onStopTimer
+}) {
+  const elapsed = useElapsedSeconds(timerStartedAt);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "rank-edit-row"
+  }, /*#__PURE__*/React.createElement("select", {
+    value: turnOrder,
+    style: {
+      width: 90
+    },
+    onChange: ev => onSetTurnOrder(parseInt(ev.target.value, 10))
+  }, Array.from({
+    length: entryCount
+  }, (_, i) => i + 1).map(n => /*#__PURE__*/React.createElement("option", {
+    key: n,
+    value: n
+  }, n, "\uBC88\uC9F8"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 30,
+      textAlign: "center",
+      fontWeight: 900,
+      color: "var(--gold)"
+    }
+  }, rank || "-"), /*#__PURE__*/React.createElement(TeamChip, {
+    team: team,
+    exec: exec,
+    champion: rank === 1
+  }), timerRunning ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+    className: "timer-live-clock"
+  }, fmtTime(elapsed)), /*#__PURE__*/React.createElement("button", {
+    className: "timer-stop-btn",
+    onClick: onStopTimer
+  }, "\u25A0 \uC815\uC9C0")) : /*#__PURE__*/React.createElement("button", {
+    className: "timer-start-btn",
+    disabled: anotherTimerRunning,
+    onClick: onStartTimer
+  }, "\u25B6 \uC2DC\uC791"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    style: {
+      marginLeft: "auto",
+      width: 100
+    },
+    placeholder: "mm:ss",
+    key: entry.timeSec,
+    defaultValue: entry.timeSec != null ? fmtTime(entry.timeSec) : "",
+    onBlur: ev => onSetTime(ev.target.value)
+  }));
+}
+
 /* ============================== admin: day tab ============================== */
 function DayTab({
   dayKey,
@@ -1901,6 +2015,28 @@ function DayTab({
   const ranked = getRankedEntries(dayState);
   const rankOf = Object.fromEntries(ranked.map(e => [e.teamId, e.rank]));
   const turnOrder = turnOrderOf(dayState);
+  const timer = state.display.day3Timer || {
+    teamId: null,
+    startedAt: null
+  };
+  const startTimer = teamId => update(s => {
+    s.display.day3Timer = {
+      teamId,
+      startedAt: Date.now()
+    };
+    return s;
+  });
+  const stopTimer = () => update(s => {
+    const t = s.display.day3Timer;
+    if (!t || !t.teamId) return null;
+    const e = s.days.day3.entries.find(x => x.teamId === t.teamId);
+    if (e) e.timeSec = (Date.now() - t.startedAt) / 1000;
+    s.display.day3Timer = {
+      teamId: null,
+      startedAt: null
+    };
+    return s;
+  });
   return /*#__PURE__*/React.createElement("div", {
     className: "card"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1916,48 +2052,28 @@ function DayTab({
       marginTop: -6,
       marginBottom: 12
     }
-  }, "\uC9C4\uD589\uC21C\uC11C\uB294 \uD300\uBE4C\uB529 \uCF54\uC2A4\uB97C \uB3C4\uB294 \uC21C\uC11C(\uD604\uC7A5 \uB300\uAE30\uC5F4)\uC774\uACE0, \uC21C\uC704\uB294 \uC644\uB8CC \uC2DC\uAC04\uC73C\uB85C \uC790\uB3D9 \uACC4\uC0B0\uB429\uB2C8\uB2E4 \u2014 \uC11C\uB85C \uC601\uD5A5\uC744 \uC8FC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", {
+  }, "\uC9C4\uD589\uC21C\uC11C\uB294 \uD300\uBE4C\uB529 \uCF54\uC2A4\uB97C \uB3C4\uB294 \uC21C\uC11C(\uD604\uC7A5 \uB300\uAE30\uC5F4)\uC774\uACE0, \uC21C\uC704\uB294 \uC644\uB8CC \uC2DC\uAC04\uC73C\uB85C \uC790\uB3D9 \uACC4\uC0B0\uB429\uB2C8\uB2E4 \u2014 \uC11C\uB85C \uC601\uD5A5\uC744 \uC8FC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \"\uC2DC\uC791\"\uC744 \uB204\uB974\uBA74 TV \uC1A1\uCD9C \uD654\uBA74\uC5D0 \uADF8 \uD300\uC758 \uD0C0\uC774\uBA38\uAC00 \uD06C\uAC8C \uD45C\uC2DC\uB418\uACE0, \"\uC815\uC9C0\"\uB97C \uB204\uB974\uBA74 \uADF8 \uC2DC\uAC04\uC774 \uC790\uB3D9\uC73C\uB85C \uAE30\uB85D\uB429\uB2C8\uB2E4."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
       gap: 8
     }
-  }, entries.map((e, idx) => {
-    const t = teamsById[e.teamId];
-    return /*#__PURE__*/React.createElement("div", {
-      className: "rank-edit-row",
-      key: e.teamId
-    }, /*#__PURE__*/React.createElement("select", {
-      value: turnOrder[e.teamId],
-      style: {
-        width: 90
-      },
-      onChange: ev => setTurnOrder(e.teamId, parseInt(ev.target.value, 10))
-    }, entries.map((_, i) => /*#__PURE__*/React.createElement("option", {
-      key: i,
-      value: i + 1
-    }, i + 1, "\uBC88\uC9F8"))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 30,
-        textAlign: "center",
-        fontWeight: 900,
-        color: "var(--gold)"
-      }
-    }, rankOf[e.teamId] || "-"), /*#__PURE__*/React.createElement(TeamChip, {
-      team: t,
-      exec: execTeamIds.includes(e.teamId),
-      champion: rankOf[e.teamId] === 1
-    }), /*#__PURE__*/React.createElement("input", {
-      type: "text",
-      style: {
-        marginLeft: "auto",
-        width: 100
-      },
-      placeholder: "mm:ss",
-      defaultValue: e.timeSec != null ? fmtTime(e.timeSec) : "",
-      onBlur: ev => setTime(e.teamId, ev.target.value)
-    }));
-  })));
+  }, entries.map(e => /*#__PURE__*/React.createElement(Day3EntryRow, {
+    key: e.teamId,
+    entry: e,
+    team: teamsById[e.teamId],
+    exec: execTeamIds.includes(e.teamId),
+    rank: rankOf[e.teamId],
+    turnOrder: turnOrder[e.teamId],
+    entryCount: entries.length,
+    onSetTurnOrder: n => setTurnOrder(e.teamId, n),
+    onSetTime: v => setTime(e.teamId, v),
+    timerRunning: timer.teamId === e.teamId,
+    timerStartedAt: timer.teamId === e.teamId ? timer.startedAt : null,
+    anotherTimerRunning: !!timer.teamId && timer.teamId !== e.teamId,
+    onStartTimer: () => startTimer(e.teamId),
+    onStopTimer: stopTimer
+  }))));
 }
 
 /* ============================== admin: teams tab ============================== */

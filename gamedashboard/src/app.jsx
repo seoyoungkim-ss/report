@@ -139,7 +139,7 @@ function createDefaultState(){
       day3:{ execTeams:[] },
       day4:{ execTeams:[] },
     },
-    display:{ activeDayKey:"day1" },
+    display:{ activeDayKey:"day1", day3Timer:{ teamId:null, startedAt:null } },
   };
 }
 function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
@@ -380,6 +380,18 @@ function parseTimeInput(str){
   }
   const v = parseFloat(s);
   return isNaN(v) ? null : v;
+}
+// While startedAt is set, forces a re-render every 100ms so the caller can
+// recompute elapsed time fresh from Date.now() each tick (no drift, and
+// nothing is written to localStorage while this runs).
+function useElapsedSeconds(startedAt){
+  const [, forceTick] = useState(0);
+  useEffect(()=>{
+    if(startedAt==null) return;
+    const id = setInterval(()=>forceTick(x=>x+1), 100);
+    return ()=>clearInterval(id);
+  },[startedAt]);
+  return startedAt==null ? null : (Date.now()-startedAt)/1000;
 }
 function compressImage(file, maxDim, quality){
   return new Promise((resolve, reject)=>{
@@ -670,7 +682,7 @@ function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime }){
             <span className="turn-badge" title="진행순서">{turnOrder[e.teamId]}번째 진행</span>
             <TeamChip team={t} exec={execTeamIds && execTeamIds.includes(e.teamId)} champion={e.rank===1} />
             {showTimeInput ? (
-              <input type="text" className="rank-time-input" placeholder="mm:ss"
+              <input type="text" className="rank-time-input" placeholder="mm:ss" key={e.timeSec}
                 defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}
                 onClick={(ev)=>ev.stopPropagation()}
                 onBlur={(ev)=>onSetTime(e.teamId, ev.target.value)} />
@@ -680,6 +692,17 @@ function RankingBoard({ day3, teamsById, execTeamIds, editable, onSetTime }){
           </div>
         );
       })}
+    </div>
+  );
+}
+/* Full-screen "on air" timer for the team currently running Day3's course —
+   shown on the TV screen instead of the ranking list while a timer is live. */
+function Day3TimerBanner({ team, startedAt }){
+  const elapsed = useElapsedSeconds(startedAt);
+  return (
+    <div className="day3-timer-banner">
+      <TeamChip team={team} size="big" />
+      <div className="day3-timer-clock">{fmtTime(elapsed)}</div>
     </div>
   );
 }
@@ -697,6 +720,7 @@ function DisplayView({ state, update }){
     e.timeSec = parseTimeInput(val);
     return s;
   });
+  const day3Timer = state.display.day3Timer || { teamId:null, startedAt:null };
 
   return (
     <div>
@@ -750,7 +774,9 @@ function DisplayView({ state, update }){
         <div className="today-panel-full">
           {info.format==="bracket"
             ? <InteractiveBracketSection dayKey={activeKey} state={state} update={update} teamsById={teamsById} />
-            : <RankingBoard day3={state.days.day3} teamsById={teamsById} execTeamIds={execTeamIds} editable={true} onSetTime={setDay3Time} />}
+            : (day3Timer.teamId
+                ? <Day3TimerBanner team={teamsById[day3Timer.teamId]} startedAt={day3Timer.startedAt} />
+                : <RankingBoard day3={state.days.day3} teamsById={teamsById} execTeamIds={execTeamIds} editable={true} onSetTime={setDay3Time} />)}
         </div>
       </div>
     </div>
@@ -920,6 +946,34 @@ function SeedingEditor({ dayKey, bracket, teams, update }){
   );
 }
 
+/* Broken out from DayTab's day3 list so useElapsedSeconds (a hook) can be
+   called once per row — only the running team's row actually ticks. */
+function Day3EntryRow({ entry, team, exec, rank, turnOrder, entryCount, onSetTurnOrder, onSetTime,
+  timerRunning, timerStartedAt, anotherTimerRunning, onStartTimer, onStopTimer }){
+  const elapsed = useElapsedSeconds(timerStartedAt);
+  return (
+    <div className="rank-edit-row">
+      <select value={turnOrder} style={{width:90}}
+        onChange={(ev)=>onSetTurnOrder(parseInt(ev.target.value,10))}>
+        {Array.from({length:entryCount},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}번째</option>)}
+      </select>
+      <div style={{width:30,textAlign:"center",fontWeight:900,color:"var(--gold)"}}>{rank||"-"}</div>
+      <TeamChip team={team} exec={exec} champion={rank===1} />
+      {timerRunning ? (
+        <>
+          <span className="timer-live-clock">{fmtTime(elapsed)}</span>
+          <button className="timer-stop-btn" onClick={onStopTimer}>■ 정지</button>
+        </>
+      ) : (
+        <button className="timer-start-btn" disabled={anotherTimerRunning} onClick={onStartTimer}>▶ 시작</button>
+      )}
+      <input type="text" style={{marginLeft:"auto",width:100}} placeholder="mm:ss"
+        key={entry.timeSec} defaultValue={entry.timeSec!=null?fmtTime(entry.timeSec):""}
+        onBlur={(ev)=>onSetTime(ev.target.value)} />
+    </div>
+  );
+}
+
 /* ============================== admin: day tab ============================== */
 function DayTab({ dayKey, state, update, teamsById }){
   const info = dayInfo(dayKey);
@@ -961,6 +1015,19 @@ function DayTab({ dayKey, state, update, teamsById }){
   const ranked = getRankedEntries(dayState);
   const rankOf = Object.fromEntries(ranked.map(e=>[e.teamId,e.rank]));
   const turnOrder = turnOrderOf(dayState);
+  const timer = state.display.day3Timer || { teamId:null, startedAt:null };
+  const startTimer = (teamId)=> update(s=>{
+    s.display.day3Timer = { teamId, startedAt: Date.now() };
+    return s;
+  });
+  const stopTimer = ()=> update(s=>{
+    const t = s.display.day3Timer;
+    if(!t || !t.teamId) return null;
+    const e = s.days.day3.entries.find(x=>x.teamId===t.teamId);
+    if(e) e.timeSec = (Date.now()-t.startedAt)/1000;
+    s.display.day3Timer = { teamId:null, startedAt:null };
+    return s;
+  });
 
   return (
     <div className="card">
@@ -970,24 +1037,18 @@ function DayTab({ dayKey, state, update, teamsById }){
       </div>
       <p style={{color:"var(--sub)",fontSize:12,marginTop:-6,marginBottom:12}}>
         진행순서는 팀빌딩 코스를 도는 순서(현장 대기열)이고, 순위는 완료 시간으로 자동 계산됩니다 — 서로 영향을 주지 않습니다.
+        "시작"을 누르면 TV 송출 화면에 그 팀의 타이머가 크게 표시되고, "정지"를 누르면 그 시간이 자동으로 기록됩니다.
       </p>
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {entries.map((e,idx)=>{
-          const t = teamsById[e.teamId];
-          return (
-            <div className="rank-edit-row" key={e.teamId}>
-              <select value={turnOrder[e.teamId]} style={{width:90}}
-                onChange={(ev)=>setTurnOrder(e.teamId, parseInt(ev.target.value,10))}>
-                {entries.map((_,i)=><option key={i} value={i+1}>{i+1}번째</option>)}
-              </select>
-              <div style={{width:30,textAlign:"center",fontWeight:900,color:"var(--gold)"}}>{rankOf[e.teamId]||"-"}</div>
-              <TeamChip team={t} exec={execTeamIds.includes(e.teamId)} champion={rankOf[e.teamId]===1} />
-              <input type="text" style={{marginLeft:"auto",width:100}} placeholder="mm:ss"
-                defaultValue={e.timeSec!=null?fmtTime(e.timeSec):""}
-                onBlur={(ev)=>setTime(e.teamId, ev.target.value)} />
-            </div>
-          );
-        })}
+        {entries.map((e)=>(
+          <Day3EntryRow key={e.teamId} entry={e} team={teamsById[e.teamId]}
+            exec={execTeamIds.includes(e.teamId)} rank={rankOf[e.teamId]}
+            turnOrder={turnOrder[e.teamId]} entryCount={entries.length}
+            onSetTurnOrder={(n)=>setTurnOrder(e.teamId, n)} onSetTime={(v)=>setTime(e.teamId, v)}
+            timerRunning={timer.teamId===e.teamId} timerStartedAt={timer.teamId===e.teamId ? timer.startedAt : null}
+            anotherTimerRunning={!!timer.teamId && timer.teamId!==e.teamId}
+            onStartTimer={()=>startTimer(e.teamId)} onStopTimer={stopTimer} />
+        ))}
       </div>
     </div>
   );
